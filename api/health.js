@@ -1,7 +1,7 @@
 // GET /api/health  → diagnostyka konfiguracji (bez ujawniania wartości sekretów).
 // Pomaga sprawdzić, czy baza i zmienne środowiskowe są poprawnie podpięte na Vercelu.
 const {
-  sql, ensureSchema, pickDbUrl, DB_URL_KEYS, wrap,
+  sql, ensureSchema, pickDbUrl, pickPooledUrl, DB_URL_KEYS, wrap,
 } = require('./_lib');
 
 module.exports = wrap(async function handler(req, res) {
@@ -14,6 +14,8 @@ module.exports = wrap(async function handler(req, res) {
       AUTH_SECRET: Boolean(process.env.AUTH_SECRET),
       dbUrl: present,
       dbUrlUsed: pickDbUrl().key, // która zmienna zostanie użyta (nazwa, nie wartość)
+      pooledAvailable: Boolean(pickPooledUrl()), // czy jest dostępny URL „pooled"
+      mode: pickPooledUrl() ? 'pool' : 'client', // tryb połączenia
     },
     db: { connected: false },
   };
