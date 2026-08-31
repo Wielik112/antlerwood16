@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produkt | ANTLERWOOD</title>
+<meta name="description" content="Rzemieślnicze meble z litego drewna i poroża, handmade w Polsce.">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="assets/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=Oswald:wght@300;400;500;600;700&family=Zilla+Slab:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="has-page-hero pdp-page">
+<div class="grain"></div>
+<div class="vignette"></div>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand" aria-label="Antlerwood"><img src="assets/logo-mark.png" alt="Antlerwood, Solid Wood & Antler Furniture" class="brand-logo"></a>
+    <nav class="links" id="menu">
+      <a href="sklep.html" class="nav-cta" data-i18n="nav.shop">Shop</a>
+      <a href="lite-drewno.html" class="navlink" data-i18n="nav.wood">Solid Wood Furniture</a>
+      <a href="poroze.html" class="navlink" data-i18n="nav.antler">Antler Furniture</a>
+      <a href="warsztat.html" class="navlink" data-i18n="nav.workshop">About us</a>
+      <a href="kontakt.html" class="navlink" data-i18n="nav.contact">Contact</a>
+    </nav>
+    <div class="nav-right">
+      <div class="lang-switch" id="langSwitch">
+        <button class="lang-current" id="langBtn" aria-label="Język" aria-haspopup="true" aria-expanded="false">
+          <span id="langLabel">PL</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="lang-menu" id="langMenu" role="menu">
+          <button type="button" data-lang="pl" role="menuitem">Polski</button>
+          <button type="button" data-lang="en" role="menuitem">English</button>
+          <button type="button" data-lang="de" role="menuitem">Deutsch</button>
+        </div>
+      </div>
+      <button class="cart-btn" id="cartBtn" aria-label="Koszyk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6L5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
+        <span class="cart-badge" id="cartBadge">0</span>
+      </button>
+      <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+<div class="cart-overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer" aria-label="Koszyk">
+  <div class="cart-head">
+    <h3 data-i18n="cart.title">Cart</h3>
+    <button class="cart-close" id="cartClose" aria-label="Zamknij">&times;</button>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-foot" id="cartFoot">
+    <div class="cart-total-row"><span data-i18n="cart.total">Total</span><span id="cartTotal">0 zł</span></div>
+    <button class="btn btn-primary" id="cartCheckout" type="button" data-i18n="cart.view">View cart</button>
+    <p class="cart-note" data-i18n="cart.note">Shipping calculated at checkout. Secure payments.</p>
+  </div>
+</aside>
+
+<!-- Treść produktu renderowana dynamicznie z /api/products/:id przez js/main.js (renderPdp) -->
+<section class="pdp" id="pdpRoot"></section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html" class="brand foot-logo" aria-label="Antlerwood"><img src="assets/logo-mark.png" alt="Antlerwood" class="brand-logo"></a>
+        <p data-i18n="foot.brandDesc">Handcrafted furniture and decor from solid wood and genuine antler. Handmade in Poland, shipped worldwide.</p>
+      </div>
+      <div class="foot-col"><h6 data-i18n="foot.collections">Collections</h6>
+        <a href="lite-drewno.html" data-i18n="nav.wood">Solid Wood Furniture</a>
+        <a href="poroze.html" data-i18n="nav.antler">Antler Furniture</a>
+        <a href="sklep.html" data-i18n="foot.allShop">Full shop</a>
+      </div>
+      <div class="foot-col"><h6 data-i18n="foot.company">Company</h6>
+        <a href="warsztat.html" data-i18n="nav.workshop">About us</a>
+        <a href="kontakt.html" data-i18n="foot.custom">Custom orders</a>
+        <a href="kontakt.html" data-i18n="nav.contact">Contact</a>
+      </div>
+      <div class="foot-col"><h6 data-i18n="foot.help">Help</h6>
+        <a href="wysylka.html" data-i18n="foot.shipping">Shipping & returns</a>
+        <a href="pielegnacja.html" data-i18n="foot.care">Wood care</a>
+        <a href="regulamin.html" data-i18n="foot.terms">Terms</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>© 2026 ANTLERWOOD, SOLID WOOD &amp; ANTLER FURNITURE</p>
+      <div class="socials">
+        <a href="https://www.instagram.com/antler.wood" target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.tiktok.com/@antlerwood_" target="_blank" rel="noopener" aria-label="TikTok"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 4c.5 2.5 2 4 4.5 4.3v3c-1.7 0-3.2-.5-4.5-1.4V15a6 6 0 11-6-6c.3 0 .7 0 1 .1v3.1a3 3 0 102 2.8V4h3z"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cart.added">Added to cart</span></div>
+<script src="js/i18n.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

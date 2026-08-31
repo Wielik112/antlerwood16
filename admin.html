@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel admina | ANTLERWOOD</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Zilla+Slab:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1a1512; --panel:#241d18; --panel2:#2c241e; --line:#3a2f26;
+    --text:#f0e7dc; --muted:#b7a795; --accent:#c98a3c; --accent2:#8a5a2b;
+    --danger:#c0492f; --ok:#4c8a3c; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Zilla Slab',Georgia,serif;line-height:1.5}
+  h1,h2,h3,label,button,th,.brandline{font-family:'Oswald',sans-serif}
+  a{color:var(--accent)}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brandline{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .brandline img{height:34px;width:auto;border-radius:6px}
+  .wrap{max-width:1040px;margin:0 auto;padding:26px 22px 80px}
+  .btn{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:13px;border:none;border-radius:9px;padding:11px 18px;cursor:pointer;transition:.15s;background:var(--accent);color:#1a1512}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.danger{background:transparent;color:#e8927c;border:1px solid #6b3428}
+  .btn.danger:hover{background:#3a1f18}
+  .btn.small{padding:7px 12px;font-size:12px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+  .muted{color:var(--muted)}
+  /* login */
+  .login-wrap{max-width:400px;margin:9vh auto 0;text-align:center}
+  .login-wrap .card{text-align:left}
+  /* forms */
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px 12px;font-family:'Zilla Slab',serif;font-size:15px}
+  .field textarea{min-height:78px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:640px){.row{grid-template-columns:1fr}}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  /* layout */
+  .grid2{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;align-items:start}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+  .sec-title{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+  .sec-title h2{margin:0;font-size:20px;letter-spacing:.04em}
+  /* product list */
+  .plist{display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow:auto}
+  .pitem{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .pthumb{width:52px;height:52px;border-radius:8px;background:#0e0b09 center/cover no-repeat;flex:0 0 auto;border:1px solid var(--line)}
+  .pmeta{flex:1;min-width:0}
+  .pmeta b{display:block;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pmeta .sub{font-size:12.5px;color:var(--muted)}
+  .badge{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .pactions{display:flex;gap:6px;flex:0 0 auto}
+  /* toast */
+  #msg{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--accent);padding:12px 18px;border-radius:10px;transition:.25s;max-width:90vw;z-index:20}
+  #msg.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #msg.err{border-left-color:var(--danger)}
+  #msg.ok{border-left-color:var(--ok)}
+  .empty{padding:26px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+  .hidden{display:none!important}
+  code{background:var(--bg);padding:2px 6px;border-radius:5px;border:1px solid var(--line);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brandline"><img src="assets/logo-mark.png" alt="Antlerwood">Panel admina</div>
+  <div id="topActions" class="hidden">
+    <a class="btn secondary small" href="sklep.html" target="_blank">Podgląd sklepu ↗</a>
+    <button class="btn secondary small" id="logoutBtn" type="button">Wyloguj</button>
+  </div>
+</div>
+
+<!-- EKRAN LOGOWANIA -->
+<div class="login-wrap" id="loginScreen">
+  <div class="card">
+    <h2 style="margin-top:0">Logowanie</h2>
+    <p class="muted" style="margin-top:0">Podaj hasło administratora, aby zarządzać produktami.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="pw">Hasło</label>
+        <input type="password" id="pw" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit" style="width:100%">Zaloguj</button>
+    </form>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="wrap hidden" id="panel">
+  <div class="grid2">
+
+    <!-- FORMULARZ -->
+    <div class="card">
+      <div class="sec-title"><h2 id="formTitle">Dodaj produkt</h2>
+        <button class="btn secondary small hidden" id="cancelEdit" type="button">Anuluj edycję</button></div>
+      <form id="productForm">
+        <input type="hidden" id="editingId">
+        <div class="field">
+          <label for="f-name">Nazwa *</label>
+          <input type="text" id="f-name" required placeholder="np. Półka z litego dębu">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="f-cat">Kategoria</label>
+            <select id="f-cat">
+              <option value="wood">Lite drewno</option>
+              <option value="antler">Poroże</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-price">Cena (zł)</label>
+            <input type="number" id="f-price" min="0" step="1" placeholder="590">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-desc">Opis</label>
+          <textarea id="f-desc" placeholder="Krótki opis produktu…"></textarea>
+        </div>
+        <div class="field">
+          <label for="f-img">Zdjęcie (adres URL)</label>
+          <input type="url" id="f-img" placeholder="https://… lub assets/moje-zdjecie.jpg">
+          <div class="hint">Wklej link do zdjęcia albo ścieżkę do pliku wrzuconego do folderu <code>assets/</code>.</div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="f-art">Tło zapasowe (gdy brak zdjęcia)</label>
+            <select id="f-art">
+              <option value="w1">Drewno 1</option>
+              <option value="w2">Drewno 2</option>
+              <option value="w3">Drewno 3</option>
+              <option value="a1">Poroże 1</option>
+              <option value="a2">Poroże 2</option>
+              <option value="a3">Poroże 3</option>
+              <option value="centerpc">Wyróżnione</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-id">Identyfikator (id)</label>
+            <input type="text" id="f-id" placeholder="tworzy się z nazwy">
+            <div class="hint">Zostaw puste — utworzy się automatycznie.</div>
+          </div>
+        </div>
+        <button class="btn" type="submit" id="saveBtn" style="width:100%">Zapisz produkt</button>
+      </form>
+    </div>
+
+    <!-- LISTA -->
+    <div class="card">
+      <div class="sec-title"><h2>Produkty (<span id="count">0</span>)</h2>
+        <button class="btn secondary small" id="reloadBtn" type="button">Odśwież</button></div>
+      <div id="seedBox" class="empty hidden">
+        <p>Baza jest pusta.</p>
+        <button class="btn small" id="seedBtn" type="button">Zaimportuj startowe 9 produktów</button>
+      </div>
+      <div class="plist" id="plist"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="msg"></div>
+<script src="js/admin.js"></script>
+</body>
+</html>

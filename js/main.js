@@ -5,7 +5,11 @@
             Podmień na własne foto: wrzuć plik do assets/ i wpisz np. img:"assets/moje-zdjecie.jpg".
    - "art": zapasowe tło CSS w kolorach marki — pokaże się automatycznie, gdyby zdjęcie się nie załadowało.
 */
-const PRODUCTS = [
+/* PRODUCTS = dane produktów.
+   Poniższa lista to DANE STARTOWE / FALLBACK — używane, gdy backend (API) nie odpowiada
+   (np. strona otwarta lokalnie z pliku). Na Vercelu z podpiętą bazą produkty są pobierane
+   z /api/products (patrz loadProductsFromApi na końcu pliku) i ta lista jest podmieniana. */
+let PRODUCTS = [
   {id:"polka-dab",name:"Półka z litego dębu",cat:"wood",art:"w1",tag:"Lite drewno",price:590,desc:"Masywna półka ścienna z naturalnym rysunkiem słojów, olejowana ręcznie.",img:"https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?w=800&q=80&auto=format&fit=crop"},
   {id:"stol-plaster",name:"Stół z plastra drewna",cat:"wood",art:"w2",tag:"Lite drewno",price:2400,desc:"Blat z pojedynczego plastra pnia, surowa krawędź, stalowe nogi.",img:"https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=800&q=80&auto=format&fit=crop"},
   {id:"wieszak-deska",name:"Wieszak deska i poroże",cat:"antler",art:"a1",tag:"Poroże",price:340,desc:"Deska z litego drewna z autentycznym porożem jako haki. Jeden egzemplarz.",img:"https://images.unsplash.com/photo-1509660933844-6910e12765a0?w=800&q=80&auto=format&fit=crop"},
@@ -42,9 +46,18 @@ function tr(key){
   const dict = (window.I18N && window.I18N[LANG]) || {};
   return (key in dict) ? dict[key] : (window.I18N && window.I18N.pl && window.I18N.pl[key]) || key;
 }
-/* nazwa/opis produktu w bieżącym języku (fallback do danych PL w PRODUCTS) */
-function pName(p){ return tr('p.'+p.id+'.name') || p.name; }
-function pDesc(p){ return tr('p.'+p.id+'.desc') || p.desc; }
+/* tłumaczenie z fallbackiem: jeśli klucz nie istnieje w słowniku (np. produkt dodany
+   w panelu admina, który nie ma tłumaczeń), użyj wartości z danych produktu. */
+function trOr(key, fallback){
+  const cur = (window.I18N && window.I18N[LANG]) || {};
+  if(key in cur) return cur[key];
+  const pl = (window.I18N && window.I18N.pl) || {};
+  if(key in pl) return pl[key];
+  return fallback;
+}
+/* nazwa/opis produktu w bieżącym języku (fallback do danych z bazy/PRODUCTS) */
+function pName(p){ return trOr('p.'+p.id+'.name', p.name); }
+function pDesc(p){ return trOr('p.'+p.id+'.desc', p.desc); }
 function pTag(p){ return p.cat==='wood' ? tr('filter.wood') : tr('filter.antler'); }
 
 /* podmień wszystkie elementy z data-i18n / data-i18n-ph */
@@ -115,7 +128,7 @@ function renderProducts(filter){
     const visual = p.img
       ? `<div class="art ${p.art}"></div><img src="${p.img}" alt="${pName(p)}" loading="lazy" onerror="this.style.display='none'">`
       : `<div class="art ${p.art}"></div>`;
-    return `<article class="card" data-cat="${p.cat}" data-id="${p.id}" onclick="location.href='produkt-${p.id}.html'">
+    return `<article class="card" data-cat="${p.cat}" data-id="${p.id}" onclick="location.href='produkt.html?id=${encodeURIComponent(p.id)}'">
       <div class="img">${visual}<span class="tag">${pTag(p)}</span></div>
       <div class="info">
         <h4>${pName(p)}</h4>
@@ -420,12 +433,106 @@ function syncActiveChip(){
   });
 }
 
+/* ---------------- POBIERANIE PRODUKTÓW Z BACKENDU ---------------- */
+/* Pobiera produkty z /api/products (Vercel Functions + Postgres).
+   Jeśli API nie odpowiada (np. brak backendu / plik lokalny), zostaje lista fallback. */
+async function loadProductsFromApi(){
+  try{
+    const res = await fetch('/api/products', { headers:{ 'Accept':'application/json' } });
+    if(!res.ok) return false;
+    const data = await res.json();
+    if(Array.isArray(data) && data.length){
+      PRODUCTS = data;
+      return true;
+    }
+  }catch(e){ /* offline / brak API — używamy fallbacku */ }
+  return false;
+}
+
+/* ---------------- DYNAMICZNA STRONA PRODUKTU (produkt.html?id=...) ---------------- */
+function renderPdp(){
+  const root = document.getElementById('pdpRoot');
+  if(!root) return;
+  const id = new URLSearchParams(location.search).get('id');
+  const p = PRODUCTS.find(x=>x.id===id);
+
+  if(!p){
+    root.innerHTML = `<div class="wrap" style="padding:120px 0;text-align:center">
+      <h1>${tr('pdp.notfound')||'Nie znaleziono produktu'}</h1>
+      <p><a class="pdp-back" href="sklep.html">${tr('pdp.back')||'← Wróć do sklepu'}</a></p></div>`;
+    return;
+  }
+
+  const collectionHref = p.cat==='wood' ? 'lite-drewno.html' : 'poroze.html';
+  const collectionKey  = p.cat==='wood' ? 'nav.wood' : 'nav.antler';
+  const catKey         = p.cat==='wood' ? 'filter.wood' : 'filter.antler';
+  const visual = p.img
+    ? `<div class="art ${p.art}"></div><img src="${p.img}" alt="${pName(p)}" onerror="this.style.display='none'">`
+    : `<div class="art ${p.art}"></div>`;
+
+  // produkty powiązane: inne z tej samej kategorii (maks. 3)
+  const related = PRODUCTS.filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,3);
+  const relHtml = related.map(r=>{
+    const rv = r.img
+      ? `<div class="art ${r.art}"></div><img src="${r.img}" alt="${pName(r)}" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="art ${r.art}"></div>`;
+    return `<a href="produkt.html?id=${encodeURIComponent(r.id)}" class="rel-card">
+      <div class="rel-img">${rv}</div>
+      <div class="rel-info"><h4>${pName(r)}</h4><span class="price">${fmtPrice(r.price)}</span></div>
+    </a>`;
+  }).join('');
+
+  document.title = `${pName(p)} | ANTLERWOOD`;
+
+  root.innerHTML = `<div class="wrap">
+    <nav class="crumbs"><a href="index.html">${tr('pdp.start')||'Start'}</a> <span>/</span>
+      <a href="${collectionHref}">${tr(collectionKey)}</a> <span>/</span> <em>${pName(p)}</em></nav>
+    <div class="pdp-grid">
+      <div class="pdp-gallery reveal">
+        <div class="pdp-main">${visual}<span class="tag">${tr(catKey)}</span></div>
+      </div>
+      <div class="pdp-info reveal">
+        <div class="kick">${tr(catKey)}</div>
+        <h1>${pName(p)}</h1>
+        <div class="pdp-price">${fmtPrice(p.price)}</div>
+        <p class="pdp-desc">${pDesc(p)}</p>
+        <div class="pdp-actions">
+          <div class="qty-stepper">
+            <button type="button" class="qty-btn" id="pdpDec" aria-label="Mniej">–</button>
+            <span id="pdpQty">1</span>
+            <button type="button" class="qty-btn" id="pdpInc" aria-label="Więcej">+</button>
+          </div>
+          <button class="btn btn-primary pdp-add" type="button" data-id="${p.id}" id="pdpAdd">${tr('pdp.add')||'Do koszyka'}</button>
+        </div>
+        <a href="${collectionHref}" class="pdp-back">${tr('pdp.back')||'← Wróć do kolekcji'}</a>
+      </div>
+    </div>
+    ${related.length ? `<div class="pdp-related">
+      <div class="sec-head reveal"><div class="kick">${tr('pdp.relKick')||'Zobacz też'}</div>
+        <h2>${tr('pdp.relTitle')||'Podobne'}</h2></div>
+      <div class="rel-grid stagger">${relHtml}</div>
+    </div>` : ''}
+  </div>`;
+
+  // obsługa ilości + dodania do koszyka
+  let qty = 1;
+  const qtyEl = document.getElementById('pdpQty');
+  const dec = document.getElementById('pdpDec');
+  const inc = document.getElementById('pdpInc');
+  if(dec) dec.addEventListener('click',()=>{ qty=Math.max(1,qty-1); qtyEl.textContent=qty; });
+  if(inc) inc.addEventListener('click',()=>{ qty+=1; qtyEl.textContent=qty; });
+  const add = document.getElementById('pdpAdd');
+  if(add) add.addEventListener('click',()=>addToCart(p.id, qty));
+
+  requestAnimationFrame(()=>{requestAnimationFrame(revealScan);});
+}
+
 /* init on every page */
-window.addEventListener('DOMContentLoaded',()=>{
+window.addEventListener('DOMContentLoaded',async ()=>{
   applyTranslations();     // najpierw język (statyczne teksty)
   initLangSwitch();
   syncActiveChip();
-  renderProducts();        // dynamiczne (produkty) już w wybranym języku
+  renderProducts();        // od razu render z danych fallback (szybki paint)
   initFilters();
   initMenu();
   initParallax();
@@ -434,6 +541,15 @@ window.addEventListener('DOMContentLoaded',()=>{
   initCart();
   initForm();
   revealScan();
+
+  // następnie pobierz aktualne produkty z bazy i przerenderuj, jeśli się udało
+  const ok = await loadProductsFromApi();
+  if(ok){
+    if(document.getElementById('grid')) renderProducts();
+    updateCartUI();
+  }
+  // dynamiczna strona produktu (produkt.html) — renderuj po pobraniu danych
+  renderPdp();
 });
 window.addEventListener('scroll',revealScan,{passive:true});
 window.addEventListener('load',revealScan);

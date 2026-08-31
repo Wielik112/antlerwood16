@@ -1,0 +1,13 @@
+{
+  "name": "antlerwood-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Antlerwood — statyczna strona firmowa + backend (Vercel Functions) i panel admina do zarządzania produktami.",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "@vercel/postgres": "^0.10.0"
+  }
+}
