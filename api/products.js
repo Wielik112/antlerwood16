@@ -2,7 +2,7 @@
 //   GET  → publiczna lista wszystkich produktów (używana przez sklep)
 //   POST → dodanie nowego produktu (tylko admin)
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap, saveImage, isDataUrl,
 } = require('./_lib');
 
 const CATS = ['wood', 'antler'];
@@ -60,13 +60,25 @@ module.exports = wrap(async function handler(req, res) {
     const ord = await sql`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM products;`;
     const sortOrder = ord.rows[0].next;
 
+    // Jeśli img to wgrany plik (data URL), nie zapisujemy go w kolumnie products.img —
+    // najpierw tworzymy produkt, potem blob w product_images (klucz obcy), i podmieniamy img.
+    const uploaded = isDataUrl(data.img);
+    const imgToStore = uploaded ? '' : data.img;
+
     const { rows } = await sql`
       INSERT INTO products (id, name, cat, tag, price, descr, art, img, sort_order)
       VALUES (${data.id}, ${data.name}, ${data.cat}, ${data.tag}, ${data.price},
-              ${data.descr}, ${data.art}, ${data.img}, ${sortOrder})
+              ${data.descr}, ${data.art}, ${imgToStore}, ${sortOrder})
       RETURNING *;
     `;
-    return res.status(201).json(rowToProduct(rows[0]));
+    let row = rows[0];
+
+    if (uploaded) {
+      const url = await saveImage(data.id, data.img);
+      const upd = await sql`UPDATE products SET img = ${url} WHERE id = ${data.id} RETURNING *;`;
+      row = upd.rows[0];
+    }
+    return res.status(201).json(rowToProduct(row));
   }
 
   res.setHeader('Allow', 'GET, POST');

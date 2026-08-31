@@ -64,6 +64,14 @@
   #msg.ok{border-left-color:var(--ok)}
   .empty{padding:26px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
   .hidden{display:none!important}
+  /* upload zdjęcia */
+  .img-upload{display:flex;gap:14px;align-items:flex-start}
+  .img-preview{width:104px;height:104px;flex:0 0 auto;border-radius:10px;border:1px solid var(--line);background:#0e0b09 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center;overflow:hidden}
+  .img-controls{flex:1;min-width:0}
+  .img-url-alt{margin-top:10px}
+  .img-url-alt summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-family:'Oswald',sans-serif;letter-spacing:.04em}
+  .img-url-alt input{margin-top:8px}
+  .uploading{font-size:12px;color:var(--accent)}
   code{background:var(--bg);padding:2px 6px;border-radius:5px;border:1px solid var(--line);font-size:13px}
 </style>
 </head>
@@ -124,9 +132,21 @@
           <textarea id="f-desc" placeholder="Krótki opis produktu…"></textarea>
         </div>
         <div class="field">
-          <label for="f-img">Zdjęcie (adres URL)</label>
-          <input type="url" id="f-img" placeholder="https://… lub assets/moje-zdjecie.jpg">
-          <div class="hint">Wklej link do zdjęcia albo ścieżkę do pliku wrzuconego do folderu <code>assets/</code>.</div>
+          <label>Zdjęcie produktu</label>
+          <div class="img-upload">
+            <div class="img-preview" id="imgPreview"><span>Brak zdjęcia</span></div>
+            <div class="img-controls">
+              <input type="file" id="f-file" accept="image/*" hidden>
+              <button type="button" class="btn secondary small" id="pickBtn">Wgraj zdjęcie…</button>
+              <button type="button" class="btn danger small hidden" id="clearImgBtn">Usuń zdjęcie</button>
+              <div class="hint" id="imgHint">Wybierz plik z dysku (JPG/PNG). Zostanie automatycznie
+                pomniejszony i zapisany w bazie — bez zewnętrznych usług.</div>
+            </div>
+          </div>
+          <details class="img-url-alt">
+            <summary>…albo użyj adresu URL zdjęcia</summary>
+            <input type="url" id="f-img" placeholder="https://… lub assets/moje-zdjecie.jpg">
+          </details>
         </div>
         <div class="row">
           <div class="field">

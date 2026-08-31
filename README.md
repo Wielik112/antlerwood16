@@ -174,6 +174,15 @@ npm run dev        # uruchamia `vercel dev` (wymaga zainstalowanego Vercel CLI i
 Bez bazy strona i tak zadziała lokalnie (produkty z listy fallback), ale panel admina
 będzie zgłaszał błąd zapisu — to normalne, dopóki nie ustawisz Postgresa i zmiennych.
 
+### Zdjęcia produktów (upload w panelu)
+W panelu `/admin`, w formularzu produktu, jest przycisk **„Wgraj zdjęcie…"**. Wybrany plik
+(JPG/PNG) jest w przeglądarce automatycznie pomniejszany i kompresowany, a następnie
+zapisywany **w bazie** (tabela `product_images`, kolumna BYTEA) — bez zewnętrznego storage
+(R2, S3 itp.). Zdjęcie jest serwowane pod adresem `GET /api/img/<id>` z długim cache
+(adres ma wersję `?v=`, więc po podmianie od razu widać nowe). Można też zamiast pliku
+podać zwykły adres URL (sekcja „…albo użyj adresu URL zdjęcia"). Usunięcie produktu
+kasuje też jego zdjęcie (ON DELETE CASCADE).
+
 ### Diagnostyka (gdy coś nie działa)
 Wejdź na `/api/health` — zobaczysz, czy baza jest podłączona (`db.connected`), pod jaką
 zmienną jest connection string (`dbUrlUsed`), w jakim trybie łączy się kod (`mode`: `pool`
