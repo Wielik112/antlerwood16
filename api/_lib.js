@@ -9,11 +9,10 @@
 //   AUTH_SECRET    – losowy sekret do podpisywania sesji (np. wynik `openssl rand -hex 32`)
 
 const crypto = require('crypto');
-const { createPool, createClient } = require('@vercel/postgres');
+const { Pool } = require('pg');
 
 // Nazwy zmiennych, pod którymi Vercel / integracja Neon potrafi trzymać connection string.
-// @vercel/postgres domyślnie czyta tylko POSTGRES_URL — tu obsługujemy też pozostałe,
-// żeby zadziałało niezależnie od tego, jak baza została podpięta.
+// Obsługujemy kilka, żeby zadziałało niezależnie od tego, jak baza została podpięta.
 const DB_URL_KEYS = [
   'POSTGRES_URL',
   'POSTGRES_PRISMA_URL',
@@ -29,13 +28,10 @@ function pickDbUrl() {
   return { key: null, url: null };
 }
 
-// Czy dany connection string jest „pooled" (przez pgbouncer)?
-// Neon: host z „-pooler.", Prisma-URL: parametr „pgbouncer=true".
+// Czy dany connection string jest „pooled" (przez pgbouncer)? (tylko informacyjnie)
 function isPooled(url) {
   return !!url && (/-pooler\./.test(url) || /[?&]pgbouncer=true/.test(url));
 }
-
-// Znajdź URL pooled wśród wszystkich kandydatów (jeśli w ogóle istnieje).
 function pickPooledUrl() {
   for (const k of DB_URL_KEYS) {
     if (isPooled(process.env[k])) return process.env[k];
@@ -43,45 +39,36 @@ function pickPooledUrl() {
   return null;
 }
 
-// Wybór trybu połączenia:
-//  - jeśli mamy connection string „pooled" → createPool (zalecane na produkcji),
-//  - w przeciwnym razie (mamy tylko connection direct) → createClient,
-//    który potrafi łączyć się bezpośrednio (bez tego @vercel/postgres rzuca
-//    „invalid_connection_string: ... use a pooled connection string ...").
+// Połączenie z bazą przez klasyczny sterownik `pg` (TCP) — działa z każdym
+// connection stringiem (pooled i direct), bez WebSocketów. Neon/Vercel Postgres
+// wymaga SSL; connection string zwykle zawiera już `sslmode=require`.
 let _pool = null;
-let _client = null;
-let _clientReady = null;
-
-async function getRunner() {
-  const pooled = pickPooledUrl();
-  if (pooled) {
-    if (!_pool) _pool = createPool({ connectionString: pooled });
-    return _pool;
-  }
+function getPool() {
+  if (_pool) return _pool;
   const { url } = pickDbUrl();
-  if (!_client) {
-    _client = createClient(url ? { connectionString: url } : undefined);
-    _clientReady = _client.connect().catch((e) => { _client = null; _clientReady = null; throw e; });
-  }
-  await _clientReady;
-  return _client;
+  if (!url) throw new Error('Brak connection stringa do bazy (POSTGRES_URL / DATABASE_URL).');
+  const needsSsl = /sslmode=require/i.test(url) || /neon\.tech|vercel|supabase|amazonaws|render\.com/i.test(url);
+  _pool = new Pool({
+    connectionString: url,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+    max: 3,                       // mało połączeń — panel admina ma niski ruch
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000,
+  });
+  // nie wywalaj procesu przy błędzie bezczynnego połączenia
+  _pool.on('error', () => {});
+  return _pool;
 }
 
-// Tagged-template zapytanie SQL, kompatybilne z dotychczasowym użyciem `sql\`...\``.
-// Przy zerwanym połączeniu klienta resetuje je i próbuje raz jeszcze.
-async function sql(strings, ...values) {
-  try {
-    const runner = await getRunner();
-    return await runner.sql(strings, ...values);
-  } catch (err) {
-    const msg = String((err && err.message) || err);
-    if (_client && /connect|terminat|ECONNRESET|closed|ended|timeout/i.test(msg)) {
-      _client = null; _clientReady = null;
-      const runner = await getRunner();
-      return await runner.sql(strings, ...values);
-    }
-    throw err;
+// Tagged-template `sql\`...${x}...\`` → zapytanie parametryzowane ($1, $2, ...).
+// Zwraca { rows }, tak jak dotychczas oczekują handlery.
+function sql(strings, ...values) {
+  let text = '';
+  for (let i = 0; i < strings.length; i += 1) {
+    text += strings[i];
+    if (i < values.length) text += '$' + (i + 1);
   }
+  return getPool().query(text, values);
 }
 
 const COOKIE_NAME = 'aw_admin';
