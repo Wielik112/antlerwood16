@@ -2,7 +2,7 @@
 //   GET  → publiczna lista wszystkich produktów (używana przez sklep)
 //   POST → dodanie nowego produktu (tylko admin)
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
 } = require('./_lib');
 
 const CATS = ['wood', 'antler'];
@@ -38,7 +38,7 @@ function validate(body, { requireId } = {}) {
   return { data: { id, name, cat, tag, price, descr, art, img } };
 }
 
-module.exports = async function handler(req, res) {
+module.exports = wrap(async function handler(req, res) {
   await ensureSchema();
 
   if (req.method === 'GET') {
@@ -71,7 +71,7 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Allow', 'GET, POST');
   return res.status(405).json({ error: 'Method not allowed' });
-};
+});
 
 module.exports.validate = validate;
 module.exports.slugify = slugify;

@@ -41,7 +41,7 @@ let PRODUCTS = [];
 
 /* ---------- pomocnicze ---------- */
 function toast(text, type) {
-  el.msg.textContent = text;
+  el.msg.textContent = (text == null) ? '' : String(text);
   el.msg.className = 'show ' + (type || '');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { el.msg.className = ''; }, 3200);
@@ -52,9 +52,20 @@ async function api(path, opts = {}) {
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     ...opts,
   });
+  // Odczytaj treść jako tekst, a potem spróbuj sparsować JSON — dzięki temu
+  // nawet gdy serwer zwróci nie-JSON (np. surowy błąd 500), pokażemy sensowny komunikat.
+  const raw = await res.text();
   let data = null;
-  try { data = await res.json(); } catch (e) { /* brak treści */ }
-  if (!res.ok) throw new Error((data && data.error) || `Błąd ${res.status}`);
+  try { data = raw ? JSON.parse(raw) : null; } catch (e) { /* nie-JSON */ }
+
+  if (!res.ok) {
+    let msg;
+    if (data && typeof data.error === 'string') msg = data.error;
+    else if (data && data.error) msg = JSON.stringify(data.error);
+    else if (raw) msg = raw.slice(0, 300);
+    else msg = `Błąd ${res.status}`;
+    throw new Error(msg);
+  }
   return data;
 }
 

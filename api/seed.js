@@ -3,7 +3,7 @@
 // Domyślnie nie nadpisuje istniejących danych (bezpieczne do ponownego wywołania).
 // Aby wymusić nadpisanie: POST /api/seed { "force": true }
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
 } = require('./_lib');
 
 // Te same produkty co startowe w js/main.js (fallback frontendu).
@@ -19,7 +19,7 @@ const SEED = [
   { id: 'stolek-poroze', name: 'Stołek z poroża', cat: 'antler', art: 'a2', tag: 'Poroże', price: 1150, desc: 'Stołek wykonany w całości z użyciem poroża, rzeźbiarska forma użytkowa.', img: 'https://images.unsplash.com/photo-1503602642458-232111445657?w=800&q=80&auto=format&fit=crop' },
 ];
 
-module.exports = async function handler(req, res) {
+module.exports = wrap(async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -49,4 +49,4 @@ module.exports = async function handler(req, res) {
 
   const { rows } = await sql`SELECT * FROM products ORDER BY sort_order ASC;`;
   return res.status(200).json({ ok: true, seeded: rows.length, products: rows.map(rowToProduct) });
-};
+});
