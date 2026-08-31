@@ -35,9 +35,21 @@ const el = {
 const f = {
   name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
   desc: $('f-desc'), img: $('f-img'), art: $('f-art'), id: $('f-id'),
+  file: $('f-file'),
+};
+const imgUI = {
+  preview: $('imgPreview'),
+  pickBtn: $('pickBtn'),
+  clearBtn: $('clearImgBtn'),
+  hint: $('imgHint'),
 };
 
 let PRODUCTS = [];
+
+// Stan zdjęcia w formularzu
+let pendingImageDataUrl = null; // nowy, wgrany plik (data URL) do wysłania
+let existingImg = '';           // obecne zdjęcie edytowanego produktu (do zachowania)
+let imageCleared = false;       // czy użytkownik kliknął „Usuń zdjęcie"
 
 /* ---------- pomocnicze ---------- */
 function toast(text, type) {
@@ -75,6 +87,107 @@ function escapeHtml(s) {
   ));
 }
 function fmtPrice(v) { return Number(v || 0).toLocaleString('pl-PL') + ' zł'; }
+
+/* ---------- zdjęcie: kompresja w przeglądarce + podgląd ---------- */
+// Wczytaj plik, pomniejsz do maxDim i wyeksportuj jako JPEG data URL.
+// Jeśli wynik dalej za duży, obniż jakość/rozmiar.
+function compressImage(file, maxDim = 1400, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = image;
+      if (width > maxDim || height > maxDim) {
+        const s = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * s);
+        height = Math.round(height * s);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; // tło pod ewentualną przezroczystość (PNG → JPEG)
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+      let out = canvas.toDataURL('image/jpeg', quality);
+      // twardy limit ~3.5 MB — jak trzeba, spróbuj mocniej skompresować
+      if (out.length > 3.5 * 1024 * 1024) {
+        const c2 = document.createElement('canvas');
+        const s2 = Math.min(1000 / width, 1000 / height, 1);
+        c2.width = Math.round(width * s2); c2.height = Math.round(height * s2);
+        const x2 = c2.getContext('2d');
+        x2.fillStyle = '#ffffff'; x2.fillRect(0, 0, c2.width, c2.height);
+        x2.drawImage(image, 0, 0, c2.width, c2.height);
+        out = c2.toDataURL('image/jpeg', 0.7);
+      }
+      resolve(out);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Nie udało się wczytać obrazu.')); };
+    image.src = url;
+  });
+}
+
+function showPreview(src) {
+  if (src) {
+    imgUI.preview.style.backgroundImage = `url('${src.replace(/'/g, "\\'")}')`;
+    imgUI.preview.innerHTML = '';
+    imgUI.clearBtn.classList.remove('hidden');
+  } else {
+    imgUI.preview.style.backgroundImage = '';
+    imgUI.preview.innerHTML = '<span>Brak zdjęcia</span>';
+    imgUI.clearBtn.classList.add('hidden');
+  }
+}
+
+// Adres zdjęcia wgranego do bazy (żeby nie pokazywać go w polu URL jako „link").
+function isInternalImg(v) { return typeof v === 'string' && v.startsWith('/api/img/'); }
+
+imgUI.pickBtn.addEventListener('click', () => f.file.click());
+
+f.file.addEventListener('change', async () => {
+  const file = f.file.files && f.file.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { toast('Wybierz plik graficzny (JPG/PNG).', 'err'); return; }
+  imgUI.hint.textContent = 'Przetwarzam zdjęcie…';
+  imgUI.hint.classList.add('uploading');
+  try {
+    const dataUrl = await compressImage(file);
+    pendingImageDataUrl = dataUrl;
+    imageCleared = false;
+    f.img.value = ''; // upload ma pierwszeństwo przed URL-em
+    showPreview(dataUrl);
+    imgUI.hint.textContent = 'Zdjęcie gotowe do zapisu. Kliknij „Zapisz produkt".';
+  } catch (err) {
+    toast(err.message, 'err');
+    imgUI.hint.textContent = 'Nie udało się przetworzyć pliku.';
+  } finally {
+    imgUI.hint.classList.remove('uploading');
+    f.file.value = ''; // pozwól wybrać ten sam plik ponownie
+  }
+});
+
+imgUI.clearBtn.addEventListener('click', () => {
+  pendingImageDataUrl = null;
+  existingImg = '';
+  imageCleared = true;
+  f.img.value = '';
+  showPreview(null);
+});
+
+// podgląd przy ręcznym wpisaniu URL-a
+f.img.addEventListener('input', () => {
+  const v = f.img.value.trim();
+  if (v) { pendingImageDataUrl = null; imageCleared = false; showPreview(v); }
+  else if (!pendingImageDataUrl) showPreview(existingImg || null);
+});
+
+// Ustal finalną wartość pola img do wysłania na serwer.
+function resolveImgValue() {
+  if (pendingImageDataUrl) return pendingImageDataUrl;   // nowy wgrany plik
+  if (f.img.value.trim()) return f.img.value.trim();      // podany URL
+  if (imageCleared) return '';                            // wyczyszczono
+  return existingImg || '';                               // zachowaj obecne (edycja)
+}
 
 /* ---------- sesja ---------- */
 async function checkSession() {
@@ -159,9 +272,15 @@ function fillForm(p) {
   f.cat.value = p.cat || 'wood';
   f.price.value = p.price != null ? p.price : '';
   f.desc.value = p.desc || '';
-  f.img.value = p.img || '';
   f.art.value = p.art || 'w1';
   f.id.value = p.id || '';
+
+  // zdjęcie: zachowaj obecne; w polu URL pokaż tylko zewnętrzny link (nie wewnętrzny blob)
+  pendingImageDataUrl = null;
+  imageCleared = false;
+  existingImg = p.img || '';
+  f.img.value = (p.img && !isInternalImg(p.img)) ? p.img : '';
+  showPreview(p.img || null);
 }
 function clearForm() {
   el.editingId.value = '';
@@ -171,6 +290,13 @@ function clearForm() {
   el.saveBtn.textContent = 'Zapisz produkt';
   el.cancelEdit.classList.add('hidden');
   f.id.removeAttribute('readonly');
+  // reset stanu zdjęcia
+  pendingImageDataUrl = null;
+  existingImg = '';
+  imageCleared = false;
+  showPreview(null);
+  imgUI.hint.textContent = 'Wybierz plik z dysku (JPG/PNG). Zostanie automatycznie '
+    + 'pomniejszony i zapisany w bazie — bez zewnętrznych usług.';
 }
 function startEdit(id) {
   const p = PRODUCTS.find((x) => x.id === id);
@@ -192,7 +318,7 @@ el.productForm.addEventListener('submit', async (e) => {
     cat: f.cat.value,
     price: Number(f.price.value) || 0,
     desc: f.desc.value.trim(),
-    img: f.img.value.trim(),
+    img: resolveImgValue(),
     art: f.art.value,
     id: f.id.value.trim(),
   };

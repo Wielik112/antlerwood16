@@ -76,7 +76,7 @@ const SESSION_TTL = 60 * 60 * 12; // 12 godzin
 
 let tableReady = false;
 
-// Utwórz tabelę produktów, jeśli jeszcze nie istnieje.
+// Utwórz tabele, jeśli jeszcze nie istnieją.
 async function ensureSchema() {
   if (tableReady) return;
   await sql`
@@ -93,7 +93,41 @@ async function ensureSchema() {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `;
+  // Zdjęcia produktów wgrane w panelu trzymamy w bazie (bez zewnętrznego storage / R2).
+  // Osobna tabela, żeby duże bajty nie obciążały zapytań o listę produktów.
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_images (
+      id          TEXT PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+      data        BYTEA NOT NULL,
+      mime        TEXT NOT NULL DEFAULT 'image/jpeg',
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `;
   tableReady = true;
+}
+
+// Zapisz zdjęcie (data URL: "data:image/jpeg;base64,...") do bazy i zwróć adres,
+// pod którym będzie serwowane. Produkt o danym id musi już istnieć (klucz obcy).
+const IMG_MAX_BYTES = 4 * 1024 * 1024; // 4 MB po kompresji
+async function saveImage(id, dataUrl) {
+  const m = /^data:([\w/+.-]+);base64,(.*)$/s.exec(String(dataUrl || ''));
+  if (!m) throw new Error('Nieprawidłowy format obrazu (oczekiwano data URL base64).');
+  const mime = m[1];
+  if (!/^image\//i.test(mime)) throw new Error('Plik nie jest obrazem.');
+  const buf = Buffer.from(m[2], 'base64');
+  if (!buf.length) throw new Error('Pusty plik obrazu.');
+  if (buf.length > IMG_MAX_BYTES) throw new Error('Obraz jest za duży (limit 4 MB po kompresji).');
+  await sql`
+    INSERT INTO product_images (id, data, mime, updated_at)
+    VALUES (${id}, ${buf}, ${mime}, now())
+    ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, mime = EXCLUDED.mime, updated_at = now();
+  `;
+  return `/api/img/${encodeURIComponent(id)}?v=${Date.now()}`;
+}
+
+// Czy wartość pola img to wgrany plik (data URL) zamiast zwykłego linku?
+function isDataUrl(v) {
+  return typeof v === 'string' && v.startsWith('data:');
 }
 
 // Zamień wiersz z bazy na obiekt produktu w formacie, którego używa frontend.
@@ -221,6 +255,8 @@ module.exports = {
   wrap,
   pickDbUrl,
   pickPooledUrl,
+  saveImage,
+  isDataUrl,
   DB_URL_KEYS,
   COOKIE_NAME,
 };
