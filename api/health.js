@@ -15,7 +15,7 @@ module.exports = wrap(async function handler(req, res) {
       dbUrl: present,
       dbUrlUsed: pickDbUrl().key, // która zmienna zostanie użyta (nazwa, nie wartość)
       pooledAvailable: Boolean(pickPooledUrl()), // czy jest dostępny URL „pooled"
-      mode: pickPooledUrl() ? 'pool' : 'client', // tryb połączenia
+      mode: 'pg', // sterownik połączenia (klasyczny node-postgres, TCP)
     },
     db: { connected: false },
   };

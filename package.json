@@ -8,6 +8,6 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "@vercel/postgres": "^0.10.0"
+    "pg": "^8.13.1"
   }
 }
