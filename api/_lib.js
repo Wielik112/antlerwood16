@@ -9,7 +9,40 @@
 //   AUTH_SECRET    – losowy sekret do podpisywania sesji (np. wynik `openssl rand -hex 32`)
 
 const crypto = require('crypto');
-const { sql } = require('@vercel/postgres');
+const { createPool } = require('@vercel/postgres');
+
+// Nazwy zmiennych, pod którymi Vercel / integracja Neon potrafi trzymać connection string.
+// @vercel/postgres domyślnie czyta tylko POSTGRES_URL — tu obsługujemy też pozostałe,
+// żeby zadziałało niezależnie od tego, jak baza została podpięta.
+const DB_URL_KEYS = [
+  'POSTGRES_URL',
+  'POSTGRES_PRISMA_URL',
+  'DATABASE_URL',
+  'POSTGRES_URL_NON_POOLING',
+  'DATABASE_URL_UNPOOLED',
+];
+
+function pickDbUrl() {
+  for (const k of DB_URL_KEYS) {
+    if (process.env[k]) return { key: k, url: process.env[k] };
+  }
+  return { key: null, url: null };
+}
+
+let _pool = null;
+function getPool() {
+  if (_pool) return _pool;
+  const { url } = pickDbUrl();
+  // Gdy POSTGRES_URL istnieje, createPool() bez argumentów użyje go sam.
+  // W innym wypadku podajemy connection string jawnie (np. DATABASE_URL od Neona).
+  _pool = process.env.POSTGRES_URL ? createPool() : createPool({ connectionString: url || undefined });
+  return _pool;
+}
+
+// Tagged-template zapytanie SQL, kompatybilne z dotychczasowym użyciem `sql\`...\``.
+function sql(strings, ...values) {
+  return getPool().sql(strings, ...values);
+}
 
 const COOKIE_NAME = 'aw_admin';
 const SESSION_TTL = 60 * 60 * 12; // 12 godzin
@@ -115,6 +148,26 @@ function requireAuth(req, res) {
   return false;
 }
 
+// Opakowanie handlera: łapie każdy wyjątek i zwraca czytelny JSON zamiast gołego 500.
+// Dzięki temu w panelu widać prawdziwą przyczynę (np. brak podłączonej bazy).
+function wrap(handler) {
+  return async function (req, res) {
+    try {
+      await handler(req, res);
+    } catch (err) {
+      const raw = (err && err.message) ? err.message : String(err);
+      let friendly = raw;
+      if (/missing_connection_string|POSTGRES_URL|connection string|VercelPostgresError/i.test(raw)) {
+        friendly = 'Baza danych nie jest podłączona (brak zmiennej POSTGRES_URL). '
+          + 'Vercel → Storage → utwórz/podłącz Postgres do projektu, a potem zrób Redeploy.';
+      }
+      // log do konsoli funkcji (widoczny w Vercel → Logs)
+      console.error('[api] error:', raw);
+      if (!res.headersSent) res.status(500).json({ error: friendly });
+    }
+  };
+}
+
 // Odczyt JSON z body (Vercel zwykle parsuje sam, ale zabezpieczamy się na oba przypadki).
 async function readJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -138,5 +191,8 @@ module.exports = {
   setSessionCookie,
   clearSessionCookie,
   readJson,
+  wrap,
+  pickDbUrl,
+  DB_URL_KEYS,
   COOKIE_NAME,
 };

@@ -3,11 +3,11 @@
 //   PUT    → edycja produktu (tylko admin)
 //   DELETE → usunięcie produktu (tylko admin)
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
 } = require('../_lib');
 const { validate } = require('../products');
 
-module.exports = async function handler(req, res) {
+module.exports = wrap(async function handler(req, res) {
   await ensureSchema();
   const id = req.query.id;
 
@@ -48,4 +48,4 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Allow', 'GET, PUT, DELETE');
   return res.status(405).json({ error: 'Method not allowed' });
-};
+});
