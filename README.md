@@ -174,6 +174,14 @@ npm run dev        # uruchamia `vercel dev` (wymaga zainstalowanego Vercel CLI i
 Bez bazy strona i tak zadziała lokalnie (produkty z listy fallback), ale panel admina
 będzie zgłaszał błąd zapisu — to normalne, dopóki nie ustawisz Postgresa i zmiennych.
 
+### Diagnostyka (gdy coś nie działa)
+Wejdź na `/api/health` — zobaczysz, czy baza jest podłączona (`db.connected`), pod jaką
+zmienną jest connection string (`dbUrlUsed`), w jakim trybie łączy się kod (`mode`: `pool`
+lub `client`) oraz — gdy baza nie odpowiada — prawdziwy komunikat błędu (`db.error`).
+Kod obsługuje zarówno connection string „pooled" (zalecany, przez pgbouncer), jak i „direct"
+(wtedy używa pojedynczego klienta zamiast puli). Na produkcji najlepiej użyć w `POSTGRES_URL`
+adresu **pooled** z zakładki Storage (host z „-pooler").
+
 ### Bezpieczeństwo
 - Hasło admina jest sprawdzane po stronie serwera; sesja to podpisane ciasteczko `HttpOnly`
   (ważne 12 h). Nie trzymamy haseł w przeglądarce.
