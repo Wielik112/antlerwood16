@@ -2,7 +2,8 @@
 //   GET  → publiczna lista wszystkich produktów (używana przez sklep)
 //   POST → dodanie nowego produktu (tylko admin)
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap, saveImage, isDataUrl,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
+  addPhoto, syncMainImage, attachPhotos,
 } = require('./_lib');
 
 const CATS = ['wood', 'antler'];
@@ -43,7 +44,8 @@ module.exports = wrap(async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { rows } = await sql`SELECT * FROM products ORDER BY sort_order ASC, created_at ASC;`;
-    return res.status(200).json(rows.map(rowToProduct));
+    const products = await attachPhotos(rows.map(rowToProduct));
+    return res.status(200).json(products);
   }
 
   if (req.method === 'POST') {
@@ -60,25 +62,26 @@ module.exports = wrap(async function handler(req, res) {
     const ord = await sql`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM products;`;
     const sortOrder = ord.rows[0].next;
 
-    // Jeśli img to wgrany plik (data URL), nie zapisujemy go w kolumnie products.img —
-    // najpierw tworzymy produkt, potem blob w product_images (klucz obcy), i podmieniamy img.
-    const uploaded = isDataUrl(data.img);
-    const imgToStore = uploaded ? '' : data.img;
-
+    // Produkt tworzymy z pustym img — zdjęcie(a) trafiają do galerii (product_photos),
+    // a products.img jest z niej wyliczane (pierwsze zdjęcie = główne).
     const { rows } = await sql`
       INSERT INTO products (id, name, cat, tag, price, descr, art, img, sort_order)
       VALUES (${data.id}, ${data.name}, ${data.cat}, ${data.tag}, ${data.price},
-              ${data.descr}, ${data.art}, ${imgToStore}, ${sortOrder})
+              ${data.descr}, ${data.art}, '', ${sortOrder})
       RETURNING *;
     `;
     let row = rows[0];
 
-    if (uploaded) {
-      const url = await saveImage(data.id, data.img);
-      const upd = await sql`UPDATE products SET img = ${url} WHERE id = ${data.id} RETURNING *;`;
+    // Zgodność wstecz: jeśli w payloadzie przyszło pojedyncze zdjęcie (link lub wgrany plik),
+    // dodajemy je jako pierwsze zdjęcie galerii. Panel admina zwykle dosyła zdjęcia osobno.
+    if (data.img) {
+      await addPhoto(data.id, data.img, 0);
+      await syncMainImage(data.id);
+      const upd = await sql`SELECT * FROM products WHERE id = ${data.id};`;
       row = upd.rows[0];
     }
-    return res.status(201).json(rowToProduct(row));
+    const [product] = await attachPhotos([rowToProduct(row)]);
+    return res.status(201).json(product);
   }
 
   res.setHeader('Allow', 'GET, POST');

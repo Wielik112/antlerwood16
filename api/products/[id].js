@@ -3,7 +3,8 @@
 //   PUT    → edycja produktu (tylko admin)
 //   DELETE → usunięcie produktu (tylko admin)
 const {
-  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap, saveImage, isDataUrl,
+  sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
+  addPhoto, syncMainImage, attachPhotos, isDataUrl,
 } = require('../_lib');
 const { validate } = require('../products');
 
@@ -14,7 +15,8 @@ module.exports = wrap(async function handler(req, res) {
   if (req.method === 'GET') {
     const { rows } = await sql`SELECT * FROM products WHERE id = ${id};`;
     if (!rows.length) return res.status(404).json({ error: 'Nie znaleziono produktu.' });
-    return res.status(200).json(rowToProduct(rows[0]));
+    const [product] = await attachPhotos([rowToProduct(rows[0])]);
+    return res.status(200).json(product);
   }
 
   if (req.method === 'PUT') {
@@ -23,15 +25,8 @@ module.exports = wrap(async function handler(req, res) {
     const { data, error } = validate(body);
     if (error) return res.status(400).json({ error });
 
-    // Wgrany plik (data URL) → zapisz jako blob i wstaw adres endpointu zamiast bajtów.
-    let img = data.img;
-    if (isDataUrl(img)) {
-      // upewnij się, że produkt istnieje (klucz obcy product_images → products)
-      const exists = await sql`SELECT 1 FROM products WHERE id = ${id};`;
-      if (!exists.rows.length) return res.status(404).json({ error: 'Nie znaleziono produktu.' });
-      img = await saveImage(id, img);
-    }
-
+    // Zdjęcie główne (products.img) jest wyliczane z galerii — nie nadpisujemy go tutaj
+    // danymi tekstowymi formularza. Aktualizujemy tylko pozostałe pola produktu.
     const { rows } = await sql`
       UPDATE products SET
         name = ${data.name},
@@ -39,13 +34,21 @@ module.exports = wrap(async function handler(req, res) {
         tag = ${data.tag},
         price = ${data.price},
         descr = ${data.descr},
-        art = ${data.art},
-        img = ${img}
+        art = ${data.art}
       WHERE id = ${id}
       RETURNING *;
     `;
     if (!rows.length) return res.status(404).json({ error: 'Nie znaleziono produktu.' });
-    return res.status(200).json(rowToProduct(rows[0]));
+
+    // Zgodność wstecz: jeśli w payloadzie przyszło nowe wgrane zdjęcie (data URL),
+    // dodajemy je do galerii. Panel admina zwykle zarządza zdjęciami osobno (/api/photos).
+    if (isDataUrl(body.img)) {
+      await addPhoto(id, body.img);
+      await syncMainImage(id);
+    }
+    const fresh = await sql`SELECT * FROM products WHERE id = ${id};`;
+    const [product] = await attachPhotos([rowToProduct(fresh.rows[0])]);
+    return res.status(200).json(product);
   }
 
   if (req.method === 'DELETE') {

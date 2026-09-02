@@ -95,6 +95,7 @@ async function ensureSchema() {
   `;
   // Zdjęcia produktów wgrane w panelu trzymamy w bazie (bez zewnętrznego storage / R2).
   // Osobna tabela, żeby duże bajty nie obciążały zapytań o listę produktów.
+  // (starsza tabela 1:1 — zostawiamy dla zgodności i migracji)
   await sql`
     CREATE TABLE IF NOT EXISTS product_images (
       id          TEXT PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
@@ -103,7 +104,182 @@ async function ensureSchema() {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `;
+  // Galeria: WIELE zdjęć na produkt. Pierwsze (najmniejszy sort_order) = zdjęcie główne.
+  // Zdjęcie może być wgrane (data = BYTEA) albo być zewnętrznym linkiem (ext_url).
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_photos (
+      photo_id    TEXT PRIMARY KEY,
+      product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      data        BYTEA,
+      mime        TEXT NOT NULL DEFAULT 'image/jpeg',
+      ext_url     TEXT NOT NULL DEFAULT '',
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_product_photos_pid ON product_photos (product_id, sort_order);`;
+  // Prosta tabelka na flagi/metadane (np. „migracja galerii wykonana").
+  await sql`CREATE TABLE IF NOT EXISTS aw_meta (key TEXT PRIMARY KEY, val TEXT NOT NULL DEFAULT '');`;
+
+  await migratePhotos();
   tableReady = true;
+}
+
+// Jednorazowa migracja: dla każdego produktu bez żadnego zdjęcia w galerii tworzymy
+// wpis startowy na podstawie dotychczasowego stanu:
+//   - jeśli istnieje wgrany plik w product_images → kopiujemy bajty,
+//   - w przeciwnym razie jeśli products.img jest niepustym linkiem → wpis ext_url.
+// Idempotentna: gdy produkt ma już zdjęcia w galerii, jest pomijany.
+async function migratePhotos() {
+  const done = await sql`SELECT val FROM aw_meta WHERE key = 'photos_migrated';`;
+  if (done.rows.length && done.rows[0].val === '1') return;
+
+  const prods = await sql`
+    SELECT p.id, p.img,
+           pi.data AS legacy_data, pi.mime AS legacy_mime,
+           (SELECT COUNT(*)::int FROM product_photos ph WHERE ph.product_id = p.id) AS n
+    FROM products p
+    LEFT JOIN product_images pi ON pi.id = p.id;
+  `;
+  for (const r of prods.rows) {
+    if (r.n > 0) continue; // już ma galerię
+    const photoId = genPhotoId(r.id);
+    if (r.legacy_data) {
+      const buf = Buffer.isBuffer(r.legacy_data) ? r.legacy_data : Buffer.from(r.legacy_data);
+      await sql`
+        INSERT INTO product_photos (photo_id, product_id, data, mime, ext_url, sort_order)
+        VALUES (${photoId}, ${r.id}, ${buf}, ${r.legacy_mime || 'image/jpeg'}, '', 0);
+      `;
+      await sql`UPDATE products SET img = ${photoUrlFor(photoId, '')} WHERE id = ${r.id};`;
+    } else if (r.img && String(r.img).trim()) {
+      await sql`
+        INSERT INTO product_photos (photo_id, product_id, data, mime, ext_url, sort_order)
+        VALUES (${photoId}, ${r.id}, NULL, 'image/jpeg', ${String(r.img).trim()}, 0);
+      `;
+    }
+  }
+  await sql`
+    INSERT INTO aw_meta (key, val) VALUES ('photos_migrated', '1')
+    ON CONFLICT (key) DO UPDATE SET val = '1';
+  `;
+}
+
+// ---------- Galeria zdjęć ----------
+
+function genPhotoId(productId) {
+  const rand = crypto.randomBytes(4).toString('hex');
+  return `${String(productId).slice(0, 40)}-${Date.now().toString(36)}-${rand}`;
+}
+
+// Adres, pod którym serwowane jest zdjęcie: link zewnętrzny albo endpoint na bajty.
+function photoUrlFor(photoId, extUrl) {
+  return (extUrl && String(extUrl).trim()) ? String(extUrl).trim() : `/api/photos/${encodeURIComponent(photoId)}`;
+}
+function photoUrl(row) {
+  return photoUrlFor(row.photo_id, row.ext_url);
+}
+
+// Dodaj jedno zdjęcie do galerii produktu. `value` to data URL (wgrany plik) LUB zwykły link.
+// Zwraca { id, url }. Zakłada, że produkt istnieje (klucz obcy).
+async function addPhoto(productId, value, sortOrder) {
+  const photoId = genPhotoId(productId);
+  const ord = (sortOrder == null) ? await nextPhotoOrder(productId) : sortOrder;
+
+  if (isDataUrl(value)) {
+    const m = /^data:([\w/+.-]+);base64,(.*)$/s.exec(String(value));
+    if (!m) throw new Error('Nieprawidłowy format obrazu (oczekiwano data URL base64).');
+    const mime = m[1];
+    if (!/^image\//i.test(mime)) throw new Error('Plik nie jest obrazem.');
+    const buf = Buffer.from(m[2], 'base64');
+    if (!buf.length) throw new Error('Pusty plik obrazu.');
+    if (buf.length > IMG_MAX_BYTES) throw new Error('Obraz jest za duży (limit 4 MB po kompresji).');
+    await sql`
+      INSERT INTO product_photos (photo_id, product_id, data, mime, ext_url, sort_order)
+      VALUES (${photoId}, ${productId}, ${buf}, ${mime}, '', ${ord});
+    `;
+  } else {
+    const url = String(value || '').trim();
+    if (!url) throw new Error('Pusty adres zdjęcia.');
+    await sql`
+      INSERT INTO product_photos (photo_id, product_id, data, mime, ext_url, sort_order)
+      VALUES (${photoId}, ${productId}, NULL, 'image/jpeg', ${url}, ${ord});
+    `;
+  }
+  return { id: photoId, url: photoUrlFor(photoId, isDataUrl(value) ? '' : value) };
+}
+
+async function nextPhotoOrder(productId) {
+  const r = await sql`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM product_photos WHERE product_id = ${productId};`;
+  return r.rows[0].next;
+}
+
+// Lista zdjęć produktu w kolejności. Zwraca [{ id, url }].
+async function listPhotos(productId) {
+  const { rows } = await sql`
+    SELECT photo_id, ext_url FROM product_photos
+    WHERE product_id = ${productId} ORDER BY sort_order ASC, created_at ASC;
+  `;
+  return rows.map((r) => ({ id: r.photo_id, url: photoUrl(r) }));
+}
+
+// Usuń jedno zdjęcie. Zwraca product_id, do którego należało (lub null).
+async function deletePhoto(photoId) {
+  const { rows } = await sql`DELETE FROM product_photos WHERE photo_id = ${photoId} RETURNING product_id;`;
+  return rows.length ? rows[0].product_id : null;
+}
+
+// Ustaw kolejność zdjęć produktu wg podanej listy id (pierwsze = główne).
+// Id spoza listy trafiają na koniec (z zachowaniem dotychczasowej kolejności).
+async function setPhotoOrder(productId, ids) {
+  const existing = await sql`SELECT photo_id FROM product_photos WHERE product_id = ${productId} ORDER BY sort_order ASC;`;
+  const known = new Set(existing.rows.map((r) => r.photo_id));
+  const ordered = [];
+  for (const id of (ids || [])) if (known.has(id) && !ordered.includes(id)) ordered.push(id);
+  for (const r of existing.rows) if (!ordered.includes(r.photo_id)) ordered.push(r.photo_id);
+  let i = 0;
+  for (const id of ordered) {
+    await sql`UPDATE product_photos SET sort_order = ${i} WHERE photo_id = ${id};`;
+    i += 1;
+  }
+}
+
+// Ustaw products.img na adres pierwszego zdjęcia galerii (albo '' gdy brak zdjęć).
+async function syncMainImage(productId) {
+  const { rows } = await sql`
+    SELECT photo_id, ext_url FROM product_photos
+    WHERE product_id = ${productId} ORDER BY sort_order ASC, created_at ASC LIMIT 1;
+  `;
+  const img = rows.length ? photoUrl(rows[0]) : '';
+  await sql`UPDATE products SET img = ${img} WHERE id = ${productId};`;
+  return img;
+}
+
+// Dołącz galerię do listy produktów jednym zapytaniem (bez N+1).
+// Ustawia p.images (tablica adresów) i p.photos ([{id,url}] dla panelu).
+async function attachPhotos(products) {
+  if (!products.length) return products;
+  const { rows } = await sql`
+    SELECT photo_id, product_id, ext_url FROM product_photos
+    ORDER BY product_id, sort_order ASC, created_at ASC;
+  `;
+  const byProduct = new Map();
+  for (const r of rows) {
+    if (!byProduct.has(r.product_id)) byProduct.set(r.product_id, []);
+    byProduct.get(r.product_id).push({ id: r.photo_id, url: photoUrl(r) });
+  }
+  for (const p of products) {
+    const photos = byProduct.get(p.id) || [];
+    if (photos.length) {
+      p.photos = photos;
+      p.images = photos.map((x) => x.url);
+      p.img = photos[0].url;
+    } else {
+      // brak galerii — fallback na dotychczasowe pojedyncze zdjęcie (np. seed z linkiem)
+      p.photos = p.img ? [{ id: null, url: p.img }] : [];
+      p.images = p.img ? [p.img] : [];
+    }
+  }
+  return products;
 }
 
 // Zapisz zdjęcie (data URL: "data:image/jpeg;base64,...") do bazy i zwróć adres,
@@ -257,6 +433,12 @@ module.exports = {
   pickPooledUrl,
   saveImage,
   isDataUrl,
+  addPhoto,
+  listPhotos,
+  deletePhoto,
+  setPhotoOrder,
+  syncMainImage,
+  attachPhotos,
   DB_URL_KEYS,
   COOKIE_NAME,
 };
