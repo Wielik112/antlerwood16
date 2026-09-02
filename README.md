@@ -88,13 +88,64 @@ Przełącznik języka jest w prawym górnym rogu: polski, angielski, niemiecki.
 
 ### Koszyk (sklep)
 Sklep ma działający koszyk: dodawanie produktów, zmiana ilości, usuwanie i podsumowanie kwoty.
-Koszyk działa w pamięci przeglądarki podczas sesji (znika po odświeżeniu strony) — to wersja
-demonstracyjna bez backendu i płatności. Przycisk „Przejdź do kasy" pokazuje komunikat demo.
+Koszyk działa w pamięci przeglądarki (localStorage), więc jest wspólny między podstronami.
 
-**Aby uruchomić prawdziwą sprzedaż**, masz dwie drogi:
-1. **Shopify** (jest w Twoim biznesplanie) — przenieś produkty do Shopify i użyj ich koszyka/checkout.
-2. **Bramka płatności** (np. Stripe, Przelewy24, PayU) — podłącz `#cartCheckout` w `js/main.js`
-   do utworzenia sesji płatności na swoim serwerze.
+## Płatności (Stripe) — prawdziwe zakupy
+
+Sklep ma **wbudowaną, prawdziwą płatność przez Stripe** (jak w aplikacjach SaaS).
+Klient klika **„Przejdź do kasy"** na stronie koszyka → jest przekierowany na
+bezpieczną, hostowaną stronę płatności Stripe (karta, Apple/Google Pay, BLIK itd.,
+w zależności od tego, co włączysz w panelu Stripe) → po opłaceniu wraca na stronę
+`dziekujemy.html`, a zamówienie pojawia się w panelu admina.
+
+**Jak to działa (dla bezpieczeństwa):** przeglądarka wysyła do backendu tylko
+`id` produktu i ilość. **Ceny wyliczane są po stronie serwera z bazy danych** —
+nie da się zapłacić mniej przez podmianę danych w kliencie.
+
+Pliki backendu płatności:
+- `api/checkout.js` — tworzy sesję Stripe Checkout (POST z koszykiem → zwraca `url`).
+- `api/webhook.js` — odbiera zdarzenia Stripe i zapisuje opłacone zamówienie do bazy.
+- `api/order.js` — potwierdza płatność po powrocie na stronę „dziękujemy" (druga,
+  niezależna droga zapisu zamówienia — działa nawet, gdyby webhook nie doszedł).
+- `api/orders.js` — lista zamówień w panelu admina (tylko po zalogowaniu).
+
+**Wysyłka:** w `api/checkout.js` (stała `SHIPPING_OPTIONS`) są trzy przykładowe
+stawki (Polska / Europa / Świat) oraz lista krajów wysyłki (`SHIP_TO`). Dostosuj
+kwoty i kraje do własnego cennika. Stripe zbiera też adres i telefon do wysyłki.
+
+### Klucze Stripe — gdzie je wkleić na Vercelu
+
+Klucze bierzesz z panelu Stripe (**Developers → API keys** oraz **Developers → Webhooks**).
+Na start użyj kluczy **testowych** (`sk_test_…`), a po testach przełącz na **Live** (`sk_live_…`).
+
+Na Vercelu: **Project → Settings → Environment Variables** — dodaj:
+
+| Nazwa zmiennej          | Wartość                                   | Skąd                                            |
+|-------------------------|-------------------------------------------|-------------------------------------------------|
+| `STRIPE_SECRET_KEY`     | `sk_test_…` lub `sk_live_…`               | Stripe → Developers → API keys → *Secret key*   |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…`                                 | Stripe → Developers → Webhooks (patrz niżej)    |
+
+(Opcjonalnie `PUBLIC_BASE_URL`, np. `https://twojadomena.pl` — potrzebne tylko, gdy
+adresy powrotu ze Stripe miałyby się źle wyliczać; zwykle nie trzeba go ustawiać.)
+
+> **Uwaga:** klucz *publishable* (`pk_…`) nie jest tu potrzebny — używamy hostowanej
+> strony Stripe Checkout, więc w kodzie strony nie ma żadnego klucza Stripe.
+
+**Skonfigurowanie webhooka (żeby dostać `whsec_…`):**
+1. Wdróż projekt na Vercel (żeby mieć adres produkcyjny, np. `https://twojadomena.pl`).
+2. Stripe → **Developers → Webhooks → Add endpoint**.
+3. **Endpoint URL:** `https://TWOJA-DOMENA/api/webhook`
+4. **Events:** zaznacz `checkout.session.completed`
+   (i opcjonalnie `checkout.session.async_payment_succeeded`).
+5. Zapisz — Stripe pokaże **Signing secret** `whsec_…`. Wklej go do `STRIPE_WEBHOOK_SECRET`.
+6. Po dodaniu/zmianie zmiennych zrób **Redeploy** (Deployments → Redeploy).
+
+Po tym płatności działają w pełni: klient płaci, wraca na „dziękujemy", a zamówienie
+widać w panelu `/admin` (sekcja **Zamówienia**).
+
+**Alternatywy** (gdybyś kiedyś chciał zmienić podejście):
+- **Shopify** (jest w Twoim biznesplanie) — przenieś produkty do Shopify i użyj ich checkout.
+- Inna bramka (Przelewy24, PayU) — analogicznie podłącz w `api/checkout.js`.
 
 ### Zdjęcia produktów
 Produkty mają teraz przykładowe zdjęcia z Unsplash (darmowe do użytku komercyjnego,
@@ -160,6 +211,8 @@ api/
 3. **Ustaw zmienne środowiskowe** (Project → Settings → Environment Variables):
    - `ADMIN_PASSWORD` — Twoje hasło do panelu admina (ustaw własne, mocne).
    - `AUTH_SECRET` — losowy ciąg do podpisywania sesji, np. wynik `openssl rand -hex 32`.
+   - `STRIPE_SECRET_KEY` — klucz sekretny Stripe (`sk_test_…` / `sk_live_…`) — płatności.
+   - `STRIPE_WEBHOOK_SECRET` — sekret webhooka Stripe (`whsec_…`) — patrz sekcja „Płatności (Stripe)".
 4. **Wdróż ponownie** (Deployments → Redeploy), żeby zmienne i baza były aktywne.
 5. Wejdź na **`/admin`**, zaloguj się hasłem i kliknij **„Zaimportuj startowe 9 produktów"**
    (przycisk pojawia się, gdy baza jest pusta). Od tej pory zarządzasz produktami z panelu.
@@ -202,7 +255,8 @@ adresu **pooled** z zakładki Storage (host z „-pooler").
 - **Upload zdjęć** zamiast wklejania URL — można dołożyć Vercel Blob (`@vercel/blob`).
 - **Tłumaczenia nowych produktów** (PL/EN/DE) — obecnie nowy produkt pokazuje się w języku, w jakim
   go wpiszesz (fallback do danych z bazy). Docelowo pola opisu można rozbić na 3 języki.
-- **Zamówienia i płatności** — patrz sekcja „Koszyk" powyżej (Shopify / Stripe / Przelewy24).
+- **Zamówienia i płatności** — działają przez Stripe (patrz sekcja „Płatności (Stripe)" powyżej).
+  Ustaw `STRIPE_SECRET_KEY` i `STRIPE_WEBHOOK_SECRET`, a zamówienia zobaczysz w panelu `/admin`.
 
 ## Uwaga
 Placeholdery produktów to tła generowane w CSS w kolorach marki. Podmień je na realne

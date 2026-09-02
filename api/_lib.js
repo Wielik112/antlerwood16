@@ -124,6 +124,25 @@ async function ensureSchema() {
   // Prosta tabelka na flagi/metadane (np. „migracja galerii wykonana").
   await sql`CREATE TABLE IF NOT EXISTS aw_meta (key TEXT PRIMARY KEY, val TEXT NOT NULL DEFAULT '');`;
 
+  // Zamówienia opłacone przez Stripe. Kluczem jest identyfikator sesji Checkout,
+  // dzięki czemu zapis jest idempotentny (webhook i powrót na stronę „dziękujemy"
+  // mogą wywołać zapis tego samego zamówienia — nadpisze się bez duplikatów).
+  await sql`
+    CREATE TABLE IF NOT EXISTS orders (
+      id            TEXT PRIMARY KEY,          -- Stripe Checkout Session id (cs_...)
+      payment_intent TEXT NOT NULL DEFAULT '',
+      email         TEXT NOT NULL DEFAULT '',
+      customer_name TEXT NOT NULL DEFAULT '',
+      amount_total  INTEGER NOT NULL DEFAULT 0, -- w groszach
+      currency      TEXT NOT NULL DEFAULT 'pln',
+      status        TEXT NOT NULL DEFAULT 'paid',
+      items         JSONB NOT NULL DEFAULT '[]'::jsonb,
+      shipping      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_created ON orders (created_at DESC);`;
+
   await migratePhotos();
   tableReady = true;
 }
@@ -409,6 +428,77 @@ function wrap(handler) {
   };
 }
 
+// ---------- Stripe (płatności) ----------
+
+// Leniwa inicjalizacja klienta Stripe. Klucz sekretny bierzemy ze zmiennej
+// środowiskowej STRIPE_SECRET_KEY (ustaw na Vercelu → Settings → Environment Variables).
+let _stripe = null;
+function getStripe() {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error(
+      'Płatności nie są skonfigurowane (brak STRIPE_SECRET_KEY). '
+      + 'Vercel → Settings → Environment Variables → dodaj STRIPE_SECRET_KEY, potem Redeploy.',
+    );
+  }
+  // Wymagane dopiero tutaj, żeby brak pakietu nie wywalał pozostałych endpointów.
+  const Stripe = require('stripe');
+  _stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' });
+  return _stripe;
+}
+
+// Zapis opłaconego zamówienia do bazy na podstawie sesji Stripe Checkout.
+// Idempotentny: klucz główny = id sesji, więc powtórny zapis (webhook + powrót
+// użytkownika) tylko odświeża rekord zamiast tworzyć duplikat.
+// `session` powinno mieć rozwinięte `line_items` (expand: ['line_items']).
+async function recordOrder(session) {
+  if (!session || !session.id) return;
+  const items = (session.line_items && session.line_items.data ? session.line_items.data : []).map((li) => ({
+    name: li.description || (li.price && li.price.product) || '',
+    qty: li.quantity || 1,
+    amount: li.amount_total != null ? li.amount_total : (li.price ? li.price.unit_amount * (li.quantity || 1) : 0),
+  }));
+  const details = session.customer_details || {};
+  const shipping = session.shipping_details || session.shipping || {};
+  await sql`
+    INSERT INTO orders (id, payment_intent, email, customer_name, amount_total, currency, status, items, shipping)
+    VALUES (
+      ${session.id},
+      ${typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent && session.payment_intent.id) || ''},
+      ${details.email || ''},
+      ${details.name || (shipping && shipping.name) || ''},
+      ${session.amount_total || 0},
+      ${session.currency || 'pln'},
+      ${session.payment_status === 'paid' ? 'paid' : (session.status || 'pending')},
+      ${JSON.stringify(items)},
+      ${JSON.stringify(shipping || {})}
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      payment_intent = EXCLUDED.payment_intent,
+      email = EXCLUDED.email,
+      customer_name = EXCLUDED.customer_name,
+      amount_total = EXCLUDED.amount_total,
+      currency = EXCLUDED.currency,
+      status = EXCLUDED.status,
+      items = EXCLUDED.items,
+      shipping = EXCLUDED.shipping;
+  `;
+}
+
+// Odczyt surowego (nieparsowanego) body — potrzebne do weryfikacji podpisu webhooka.
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    // Jeśli Vercel udostępnił już surowy bufor/tekst, użyj go bez czytania streamu.
+    if (Buffer.isBuffer(req.body)) return resolve(req.body);
+    if (typeof req.body === 'string') return resolve(Buffer.from(req.body));
+    const chunks = [];
+    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 // Odczyt JSON z body (Vercel zwykle parsuje sam, ale zabezpieczamy się na oba przypadki).
 async function readJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -443,6 +533,9 @@ module.exports = {
   setPhotoOrder,
   syncMainImage,
   attachPhotos,
+  getStripe,
+  recordOrder,
+  readRawBody,
   DB_URL_KEYS,
   COOKIE_NAME,
 };
