@@ -34,22 +34,31 @@ const el = {
 
 const f = {
   name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
-  desc: $('f-desc'), img: $('f-img'), art: $('f-art'), id: $('f-id'),
-  file: $('f-file'),
+  desc: $('f-desc'), art: $('f-art'), id: $('f-id'),
 };
-const imgUI = {
-  preview: $('imgPreview'),
-  pickBtn: $('pickBtn'),
-  clearBtn: $('clearImgBtn'),
-  hint: $('imgHint'),
+const gal = {
+  main: $('galMain'),
+  thumbs: $('galThumbs'),
+  files: $('f-files'),
+  hint: $('galHint'),
+  urlInput: $('f-imgurl'),
+  addUrlBtn: $('addUrlBtn'),
 };
+
+const MAX_PHOTOS = 8;
 
 let PRODUCTS = [];
 
-// Stan zdjęcia w formularzu
-let pendingImageDataUrl = null; // nowy, wgrany plik (data URL) do wysłania
-let existingImg = '';           // obecne zdjęcie edytowanego produktu (do zachowania)
-let imageCleared = false;       // czy użytkownik kliknął „Usuń zdjęcie"
+// ---------- Stan galerii w formularzu ----------
+// gallery: uporządkowana lista zdjęć. Pierwsze = główne. Każdy element:
+//   { key, id, url, dataUrl }
+//     id      – identyfikator zdjęcia na serwerze (null dla nowego, niezapisanego)
+//     url     – adres do podglądu (serwerowy lub data URL / link)
+//     dataUrl – dane wgranego pliku do wysłania (tylko nowe wgrane pliki)
+let gallery = [];
+let originalIds = []; // id zdjęć wczytanych z serwera (do wykrycia usunięć przy zapisie)
+let galKeySeq = 0;
+const nextKey = () => `g${++galKeySeq}`;
 
 /* ---------- pomocnicze ---------- */
 function toast(text, type) {
@@ -127,67 +136,113 @@ function compressImage(file, maxDim = 1400, quality = 0.82) {
   });
 }
 
-function showPreview(src) {
-  if (src) {
-    imgUI.preview.style.backgroundImage = `url('${src.replace(/'/g, "\\'")}')`;
-    imgUI.preview.innerHTML = '';
-    imgUI.clearBtn.classList.remove('hidden');
+/* ---------- galeria: renderowanie ---------- */
+function cssUrl(src) { return `url('${String(src).replace(/'/g, "\\'")}')`; }
+
+function renderGallery() {
+  // duże zdjęcie główne = pierwszy element
+  const main = gallery[0];
+  if (main) {
+    gal.main.style.backgroundImage = cssUrl(main.url);
+    gal.main.innerHTML = '<span class="gallery-main-badge">Główne</span>';
   } else {
-    imgUI.preview.style.backgroundImage = '';
-    imgUI.preview.innerHTML = '<span>Brak zdjęcia</span>';
-    imgUI.clearBtn.classList.add('hidden');
+    gal.main.style.backgroundImage = '';
+    gal.main.innerHTML = '<span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>';
   }
+
+  // miniaturki
+  const thumbs = gallery.map((item) => `
+    <div class="gthumb${item === main ? ' is-main' : ''}" data-key="${item.key}"
+         title="${item === main ? 'Zdjęcie główne' : 'Kliknij, aby ustawić jako główne'}"
+         style="background-image:${cssUrl(item.url)}" tabindex="0">
+      <button type="button" class="del" data-key="${item.key}" title="Usuń zdjęcie" aria-label="Usuń zdjęcie">×</button>
+      <span class="star" aria-hidden="true">★</span>
+    </div>`).join('');
+
+  const canAdd = gallery.length < MAX_PHOTOS;
+  const addTile = canAdd
+    ? '<div class="gthumb add" id="galAddTile" title="Dodaj zdjęcia" tabindex="0">+</div>'
+    : '';
+  gal.thumbs.innerHTML = thumbs + addTile;
+
+  // zdarzenia miniaturek
+  gal.thumbs.querySelectorAll('.gthumb:not(.add)').forEach((node) => {
+    const key = node.getAttribute('data-key');
+    node.addEventListener('click', (e) => {
+      if (e.target.closest('.del')) return; // klik w „×" obsłużony niżej
+      setMain(key);
+    });
+    node.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMain(key); }
+    });
+  });
+  gal.thumbs.querySelectorAll('.del').forEach((btn) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); removePhoto(btn.getAttribute('data-key')); });
+  });
+  const addTileEl = $('galAddTile');
+  if (addTileEl) addTileEl.addEventListener('click', () => gal.files.click());
 }
 
-// Adres zdjęcia wgranego do bazy (żeby nie pokazywać go w polu URL jako „link").
-function isInternalImg(v) { return typeof v === 'string' && v.startsWith('/api/img/'); }
+// przenieś wybrane zdjęcie na początek (= główne)
+function setMain(key) {
+  const idx = gallery.findIndex((x) => x.key === key);
+  if (idx <= 0) return;
+  const [item] = gallery.splice(idx, 1);
+  gallery.unshift(item);
+  renderGallery();
+}
 
-imgUI.pickBtn.addEventListener('click', () => f.file.click());
+function removePhoto(key) {
+  gallery = gallery.filter((x) => x.key !== key);
+  renderGallery();
+}
 
-f.file.addEventListener('change', async () => {
-  const file = f.file.files && f.file.files[0];
-  if (!file) return;
-  if (!/^image\//.test(file.type)) { toast('Wybierz plik graficzny (JPG/PNG).', 'err'); return; }
-  imgUI.hint.textContent = 'Przetwarzam zdjęcie…';
-  imgUI.hint.classList.add('uploading');
+function addGalleryItem({ id = null, url, dataUrl = null }) {
+  if (gallery.length >= MAX_PHOTOS) {
+    toast(`Można dodać maksymalnie ${MAX_PHOTOS} zdjęć.`, 'err');
+    return false;
+  }
+  gallery.push({ key: nextKey(), id, url, dataUrl });
+  return true;
+}
+
+/* ---------- galeria: dodawanie plików / URL ---------- */
+gal.files.addEventListener('change', async () => {
+  const files = Array.from(gal.files.files || []);
+  gal.files.value = ''; // pozwól wybrać te same pliki ponownie
+  if (!files.length) return;
+
+  gal.hint.textContent = 'Przetwarzam zdjęcia…';
+  gal.hint.classList.add('uploading');
+  let added = 0;
   try {
-    const dataUrl = await compressImage(file);
-    pendingImageDataUrl = dataUrl;
-    imageCleared = false;
-    f.img.value = ''; // upload ma pierwszeństwo przed URL-em
-    showPreview(dataUrl);
-    imgUI.hint.textContent = 'Zdjęcie gotowe do zapisu. Kliknij „Zapisz produkt".';
+    for (const file of files) {
+      if (gallery.length >= MAX_PHOTOS) { toast(`Limit ${MAX_PHOTOS} zdjęć osiągnięty.`, 'err'); break; }
+      if (!/^image\//.test(file.type)) { toast(`Pominięto „${file.name}" — to nie obraz.`, 'err'); continue; }
+      const dataUrl = await compressImage(file);
+      if (addGalleryItem({ url: dataUrl, dataUrl })) added += 1;
+    }
+    renderGallery();
+    gal.hint.textContent = added
+      ? `Dodano ${added} zdjęć. Kliknij „Zapisz produkt", aby zapisać.`
+      : 'Nie dodano żadnego zdjęcia.';
   } catch (err) {
     toast(err.message, 'err');
-    imgUI.hint.textContent = 'Nie udało się przetworzyć pliku.';
+    gal.hint.textContent = 'Nie udało się przetworzyć pliku.';
   } finally {
-    imgUI.hint.classList.remove('uploading');
-    f.file.value = ''; // pozwól wybrać ten sam plik ponownie
+    gal.hint.classList.remove('uploading');
   }
 });
 
-imgUI.clearBtn.addEventListener('click', () => {
-  pendingImageDataUrl = null;
-  existingImg = '';
-  imageCleared = true;
-  f.img.value = '';
-  showPreview(null);
+gal.addUrlBtn.addEventListener('click', () => {
+  const v = gal.urlInput.value.trim();
+  if (!v) { toast('Wpisz adres zdjęcia.', 'err'); return; }
+  if (addGalleryItem({ url: v, dataUrl: null })) {
+    gal.urlInput.value = '';
+    renderGallery();
+    toast('Dodano zdjęcie z adresu URL.', 'ok');
+  }
 });
-
-// podgląd przy ręcznym wpisaniu URL-a
-f.img.addEventListener('input', () => {
-  const v = f.img.value.trim();
-  if (v) { pendingImageDataUrl = null; imageCleared = false; showPreview(v); }
-  else if (!pendingImageDataUrl) showPreview(existingImg || null);
-});
-
-// Ustal finalną wartość pola img do wysłania na serwer.
-function resolveImgValue() {
-  if (pendingImageDataUrl) return pendingImageDataUrl;   // nowy wgrany plik
-  if (f.img.value.trim()) return f.img.value.trim();      // podany URL
-  if (imageCleared) return '';                            // wyczyszczono
-  return existingImg || '';                               // zachowaj obecne (edycja)
-}
 
 /* ---------- sesja ---------- */
 async function checkSession() {
@@ -246,11 +301,13 @@ function renderList() {
   el.plist.innerHTML = PRODUCTS.map((p) => {
     const bg = p.img ? `background-image:url('${escapeHtml(p.img)}')` : '';
     const catLabel = p.cat === 'wood' ? 'Lite drewno' : 'Poroże';
+    const nPhotos = Array.isArray(p.images) ? p.images.length : (p.img ? 1 : 0);
+    const photoBadge = nPhotos > 1 ? ` · <span class="badge">${nPhotos} zdj.</span>` : '';
     return `<div class="pitem" data-id="${escapeHtml(p.id)}">
       <div class="pthumb" style="${bg}"></div>
       <div class="pmeta">
         <b>${escapeHtml(p.name)}</b>
-        <span class="sub">${fmtPrice(p.price)} · <span class="badge">${catLabel}</span> · <code>${escapeHtml(p.id)}</code></span>
+        <span class="sub">${fmtPrice(p.price)} · <span class="badge">${catLabel}</span>${photoBadge} · <code>${escapeHtml(p.id)}</code></span>
       </div>
       <div class="pactions">
         <button class="btn secondary small" data-act="edit">Edytuj</button>
@@ -275,12 +332,21 @@ function fillForm(p) {
   f.art.value = p.art || 'w1';
   f.id.value = p.id || '';
 
-  // zdjęcie: zachowaj obecne; w polu URL pokaż tylko zewnętrzny link (nie wewnętrzny blob)
-  pendingImageDataUrl = null;
-  imageCleared = false;
-  existingImg = p.img || '';
-  f.img.value = (p.img && !isInternalImg(p.img)) ? p.img : '';
-  showPreview(p.img || null);
+  // galeria: wczytaj zdjęcia produktu (pierwsze = główne)
+  gallery = [];
+  originalIds = [];
+  const photos = Array.isArray(p.photos) ? p.photos : [];
+  if (photos.length) {
+    for (const ph of photos) {
+      gallery.push({ key: nextKey(), id: ph.id || null, url: ph.url, dataUrl: null });
+      if (ph.id) originalIds.push(ph.id);
+    }
+  } else if (p.img) {
+    // produkt bez galerii, ale z pojedynczym zdjęciem (np. startowe z linkiem)
+    gallery.push({ key: nextKey(), id: null, url: p.img, dataUrl: null });
+  }
+  gal.urlInput.value = '';
+  renderGallery();
 }
 function clearForm() {
   el.editingId.value = '';
@@ -290,13 +356,13 @@ function clearForm() {
   el.saveBtn.textContent = 'Zapisz produkt';
   el.cancelEdit.classList.add('hidden');
   f.id.removeAttribute('readonly');
-  // reset stanu zdjęcia
-  pendingImageDataUrl = null;
-  existingImg = '';
-  imageCleared = false;
-  showPreview(null);
-  imgUI.hint.textContent = 'Wybierz plik z dysku (JPG/PNG). Zostanie automatycznie '
-    + 'pomniejszony i zapisany w bazie — bez zewnętrznych usług.';
+  // reset galerii
+  gallery = [];
+  originalIds = [];
+  gal.urlInput.value = '';
+  renderGallery();
+  gal.hint.textContent = 'Pierwsze zdjęcie jest głównym. Kliknij miniaturkę, aby ustawić ją jako '
+    + 'główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone i zapisane w bazie.';
 }
 function startEdit(id) {
   const p = PRODUCTS.find((x) => x.id === id);
@@ -311,6 +377,28 @@ function startEdit(id) {
 }
 el.cancelEdit.addEventListener('click', clearForm);
 
+// Uzgodnij galerię na serwerze z bieżącym stanem edytora:
+// 1) usuń skasowane zdjęcia, 2) dodaj nowe (w kolejności), 3) ustaw finalną kolejność.
+async function syncGallery(productId) {
+  const currentIds = gallery.filter((x) => x.id).map((x) => x.id);
+  const toDelete = originalIds.filter((id) => !currentIds.includes(id));
+  for (const id of toDelete) {
+    await api('/api/photos/' + encodeURIComponent(id), { method: 'DELETE' });
+  }
+  for (const item of gallery) {
+    if (item.id) continue; // już zapisane
+    const img = item.dataUrl || item.url;
+    const r = await api('/api/photos', {
+      method: 'POST', body: JSON.stringify({ productId, img }),
+    });
+    item.id = r.id;
+  }
+  const order = gallery.map((x) => x.id).filter(Boolean);
+  if (order.length) {
+    await api('/api/photos', { method: 'PUT', body: JSON.stringify({ productId, order }) });
+  }
+}
+
 el.productForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
@@ -318,7 +406,6 @@ el.productForm.addEventListener('submit', async (e) => {
     cat: f.cat.value,
     price: Number(f.price.value) || 0,
     desc: f.desc.value.trim(),
-    img: resolveImgValue(),
     art: f.art.value,
     id: f.id.value.trim(),
   };
@@ -326,22 +413,26 @@ el.productForm.addEventListener('submit', async (e) => {
 
   const editingId = el.editingId.value;
   el.saveBtn.disabled = true;
+  el.saveBtn.textContent = 'Zapisywanie…';
   try {
+    let productId = editingId;
     if (editingId) {
       await api('/api/products/' + encodeURIComponent(editingId), {
         method: 'PUT', body: JSON.stringify(payload),
       });
-      toast('Zapisano zmiany.', 'ok');
     } else {
-      await api('/api/products', { method: 'POST', body: JSON.stringify(payload) });
-      toast('Dodano produkt.', 'ok');
+      const created = await api('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+      productId = created.id;
     }
+    await syncGallery(productId);
+    toast(editingId ? 'Zapisano zmiany.' : 'Dodano produkt.', 'ok');
     clearForm();
     await loadProducts();
   } catch (err) {
     toast(err.message, 'err');
   } finally {
     el.saveBtn.disabled = false;
+    el.saveBtn.textContent = el.editingId.value ? 'Zapisz zmiany' : 'Zapisz produkt';
   }
 });
 
@@ -375,4 +466,5 @@ el.seedBtn.addEventListener('click', async () => {
 el.reloadBtn.addEventListener('click', loadProducts);
 
 /* start */
+renderGallery();   // pokaż pusty edytor galerii (kafel „+")
 checkSession();

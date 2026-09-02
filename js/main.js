@@ -466,9 +466,17 @@ function renderPdp(){
   const collectionHref = p.cat==='wood' ? 'lite-drewno.html' : 'poroze.html';
   const collectionKey  = p.cat==='wood' ? 'nav.wood' : 'nav.antler';
   const catKey         = p.cat==='wood' ? 'filter.wood' : 'filter.antler';
-  const visual = p.img
-    ? `<div class="art ${p.art}"></div><img src="${p.img}" alt="${pName(p)}" onerror="this.style.display='none'">`
+  // galeria: lista zdjęć (pierwsze = główne). Zgodność wstecz z pojedynczym p.img.
+  const imgs = (Array.isArray(p.images) && p.images.length) ? p.images : (p.img ? [p.img] : []);
+  const mainSrc = imgs[0] || '';
+  const visual = mainSrc
+    ? `<div class="art ${p.art}"></div><img id="pdpMainImg" src="${mainSrc}" alt="${pName(p)}" onerror="this.style.display='none'">`
     : `<div class="art ${p.art}"></div>`;
+  const thumbsHtml = imgs.length > 1
+    ? `<div class="pdp-thumbs">${imgs.map((src,i)=>
+        `<button type="button" class="pdp-thumb${i===0?' active':''}" data-src="${src}" aria-label="Zdjęcie ${i+1}">
+           <img src="${src}" alt="" loading="lazy" onerror="this.style.display='none'"></button>`).join('')}</div>`
+    : '';
 
   // produkty powiązane: inne z tej samej kategorii (maks. 3)
   const related = PRODUCTS.filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,3);
@@ -490,6 +498,7 @@ function renderPdp(){
     <div class="pdp-grid">
       <div class="pdp-gallery reveal">
         <div class="pdp-main">${visual}<span class="tag">${tr(catKey)}</span></div>
+        ${thumbsHtml}
       </div>
       <div class="pdp-info reveal">
         <div class="kick">${tr(catKey)}</div>
@@ -523,6 +532,16 @@ function renderPdp(){
   if(inc) inc.addEventListener('click',()=>{ qty+=1; qtyEl.textContent=qty; });
   const add = document.getElementById('pdpAdd');
   if(add) add.addEventListener('click',()=>addToCart(p.id, qty));
+
+  // galeria: kliknięcie miniaturki podmienia zdjęcie główne
+  const mainImg = document.getElementById('pdpMainImg');
+  root.querySelectorAll('.pdp-thumb').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const src = btn.getAttribute('data-src');
+      if(mainImg){ mainImg.src = src; mainImg.style.display=''; }
+      root.querySelectorAll('.pdp-thumb').forEach(b=>b.classList.toggle('active', b===btn));
+    });
+  });
 
   requestAnimationFrame(()=>{requestAnimationFrame(revealScan);});
 }

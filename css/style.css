@@ -449,6 +449,13 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:64px 0 34px;posi
 .pdp-main .tag{position:absolute;top:16px;left:16px;z-index:2;font-family:'Oswald';font-weight:600;
   letter-spacing:.12em;text-transform:uppercase;font-size:.68rem;padding:7px 13px;border-radius:40px;
   background:rgba(15,9,4,.72);border:1px solid var(--line);color:var(--bronze-lt);backdrop-filter:blur(4px)}
+/* mini galeria pod zdjęciem głównym */
+.pdp-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:10px;margin-top:14px}
+.pdp-thumb{position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;cursor:pointer;padding:0;
+  border:1px solid var(--line);background:var(--plank);transition:border-color .18s,transform .18s;outline:0}
+.pdp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pdp-thumb:hover{transform:translateY(-2px)}
+.pdp-thumb.active{border-color:var(--bronze-lt);box-shadow:0 0 0 2px var(--bronze-lt) inset}
 .pdp-info .kick{font-family:'Oswald';font-weight:500;letter-spacing:.32em;text-transform:uppercase;
   font-size:.74rem;color:var(--bronze);margin-bottom:16px}
 .pdp-info h1{font-family:'Rye',serif;font-weight:400;font-size:clamp(2rem,4vw,3.2rem);

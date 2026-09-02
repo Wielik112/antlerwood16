@@ -64,14 +64,38 @@
   #msg.ok{border-left-color:var(--ok)}
   .empty{padding:26px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
   .hidden{display:none!important}
-  /* upload zdjęcia */
-  .img-upload{display:flex;gap:14px;align-items:flex-start}
-  .img-preview{width:104px;height:104px;flex:0 0 auto;border-radius:10px;border:1px solid var(--line);background:#0e0b09 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center;overflow:hidden}
-  .img-controls{flex:1;min-width:0}
-  .img-url-alt{margin-top:10px}
+  /* ---------- galeria zdjęć w formularzu ---------- */
+  .gallery-editor{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
+  .gallery-main{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;border:1px solid var(--line);
+    background:#0e0b09 center/cover no-repeat;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:13px;text-align:center;overflow:hidden}
+  .gallery-main .ph{padding:0 16px;line-height:1.4}
+  .gallery-main-badge{position:absolute;top:10px;left:10px;background:var(--accent);color:#1a1512;
+    font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:4px 10px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  /* siatka miniaturek — małe kwadraciki */
+  .gallery-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:12px}
+  .gthumb{position:relative;aspect-ratio:1/1;border-radius:8px;border:1px solid var(--line);
+    background:#0e0b09 center/cover no-repeat;cursor:pointer;overflow:hidden;transition:.15s;outline:0}
+  .gthumb:hover{border-color:var(--accent2);transform:translateY(-1px)}
+  .gthumb.is-main{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .gthumb .star{position:absolute;bottom:3px;left:3px;font-size:12px;color:var(--accent);
+    text-shadow:0 1px 3px #000;opacity:0;transition:.15s}
+  .gthumb.is-main .star{opacity:1}
+  .gthumb .del{position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:6px;
+    background:rgba(20,14,11,.82);color:#e8927c;font-size:14px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;opacity:0;transition:.15s}
+  .gthumb:hover .del{opacity:1}
+  .gthumb .del:hover{background:#3a1f18;color:#fff}
+  .gthumb.add{display:flex;align-items:center;justify-content:center;border-style:dashed;background:var(--bg);
+    color:var(--muted);font-size:26px;font-weight:300}
+  .gthumb.add:hover{color:var(--accent);border-color:var(--accent)}
+  .gallery-hint{font-size:12px;color:var(--muted);margin-top:10px}
+  .gallery-hint.uploading{color:var(--accent)}
+  .img-url-alt{margin-top:12px}
   .img-url-alt summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-family:'Oswald',sans-serif;letter-spacing:.04em}
-  .img-url-alt input{margin-top:8px}
-  .uploading{font-size:12px;color:var(--accent)}
+  .url-add-row{display:flex;gap:8px;margin-top:8px}
+  .url-add-row input{flex:1}
   code{background:var(--bg);padding:2px 6px;border-radius:5px;border:1px solid var(--line);font-size:13px}
 </style>
 </head>
@@ -132,21 +156,26 @@
           <textarea id="f-desc" placeholder="Krótki opis produktu…"></textarea>
         </div>
         <div class="field">
-          <label>Zdjęcie produktu</label>
-          <div class="img-upload">
-            <div class="img-preview" id="imgPreview"><span>Brak zdjęcia</span></div>
-            <div class="img-controls">
-              <input type="file" id="f-file" accept="image/*" hidden>
-              <button type="button" class="btn secondary small" id="pickBtn">Wgraj zdjęcie…</button>
-              <button type="button" class="btn danger small hidden" id="clearImgBtn">Usuń zdjęcie</button>
-              <div class="hint" id="imgHint">Wybierz plik z dysku (JPG/PNG). Zostanie automatycznie
-                pomniejszony i zapisany w bazie — bez zewnętrznych usług.</div>
+          <label>Zdjęcia produktu</label>
+          <div class="gallery-editor">
+            <!-- duże zdjęcie główne -->
+            <div class="gallery-main" id="galMain">
+              <span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>
             </div>
+            <!-- mini galeria: kwadratowe miniaturki + kafel „dodaj" -->
+            <div class="gallery-thumbs" id="galThumbs"></div>
+            <input type="file" id="f-files" accept="image/*" multiple hidden>
+            <div class="gallery-hint" id="galHint">Pierwsze zdjęcie jest <b>główne</b>. Kliknij miniaturkę,
+              aby ustawić ją jako główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone
+              i zapisane w bazie.</div>
+            <details class="img-url-alt">
+              <summary>…albo dodaj zdjęcie z adresu URL</summary>
+              <div class="url-add-row">
+                <input type="url" id="f-imgurl" placeholder="https://… lub assets/moje-zdjecie.jpg">
+                <button type="button" class="btn secondary small" id="addUrlBtn">Dodaj</button>
+              </div>
+            </details>
           </div>
-          <details class="img-url-alt">
-            <summary>…albo użyj adresu URL zdjęcia</summary>
-            <input type="url" id="f-img" placeholder="https://… lub assets/moje-zdjecie.jpg">
-          </details>
         </div>
         <div class="row">
           <div class="field">
