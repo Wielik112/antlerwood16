@@ -461,7 +461,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:64px 0 34px;posi
 .pdp-info h1{font-family:'Rye',serif;font-weight:400;font-size:clamp(2rem,4vw,3.2rem);
   color:var(--cream);line-height:1.05;margin-bottom:18px}
 .pdp-price{font-family:'Oswald';font-weight:600;font-size:2rem;color:var(--bronze-lt);margin-bottom:24px}
-.pdp-desc{color:var(--bone);opacity:.9;font-size:1.1rem;line-height:1.7;margin-bottom:28px}
+.pdp-desc{color:var(--bone);opacity:.9;font-size:1.1rem;line-height:1.7;margin-bottom:28px;white-space:pre-line}
 .pdp-feats{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
 .pdp-feats li{display:flex;align-items:center;gap:12px;color:var(--bone);font-size:1rem}
 .pdp-feats svg{width:20px;height:20px;color:var(--bronze);flex:0 0 auto}

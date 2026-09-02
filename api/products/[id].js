@@ -34,6 +34,7 @@ module.exports = wrap(async function handler(req, res) {
         tag = ${data.tag},
         price = ${data.price},
         descr = ${data.descr},
+        desc_full = ${data.descFull},
         art = ${data.art}
       WHERE id = ${id}
       RETURNING *;

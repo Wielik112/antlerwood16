@@ -93,6 +93,9 @@ async function ensureSchema() {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `;
+  // Drugi opis: "descr" = opis główny (krótki, na liście), "desc_full" = opis produktu
+  // (pełny, na stronie produktu). ADD ... IF NOT EXISTS — bezpieczne dla istniejącej bazy.
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full TEXT NOT NULL DEFAULT '';`;
   // Zdjęcia produktów wgrane w panelu trzymamy w bazie (bez zewnętrznego storage / R2).
   // Osobna tabela, żeby duże bajty nie obciążały zapytań o listę produktów.
   // (starsza tabela 1:1 — zostawiamy dla zgodności i migracji)
@@ -314,7 +317,8 @@ function rowToProduct(r) {
     cat: r.cat,
     tag: r.tag,
     price: Number(r.price),
-    desc: r.descr,          // frontend używa pola „desc"
+    desc: r.descr,          // opis główny (krótki) — frontend używa pola „desc"
+    descFull: r.desc_full || '', // opis produktu (pełny) — strona produktu
     art: r.art,
     img: r.img,
   };
