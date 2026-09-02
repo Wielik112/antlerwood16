@@ -30,6 +30,9 @@ const el = {
   seedBox: $('seedBox'),
   seedBtn: $('seedBtn'),
   msg: $('msg'),
+  ordersBox: $('ordersBox'),
+  ordersCount: $('ordersCount'),
+  ordersReload: $('ordersReload'),
 };
 
 const f = {
@@ -263,6 +266,7 @@ async function showPanel() {
   el.panel.classList.remove('hidden');
   el.topActions.classList.remove('hidden');
   await loadProducts();
+  loadOrders();
 }
 
 el.loginForm.addEventListener('submit', async (e) => {
@@ -466,6 +470,57 @@ el.seedBtn.addEventListener('click', async () => {
 });
 
 el.reloadBtn.addEventListener('click', loadProducts);
+
+/* ---------- zamówienia (Stripe) ---------- */
+function fmtGrosze(v, cur) {
+  const amount = Number(v || 0) / 100;
+  const c = String(cur || 'pln').toUpperCase();
+  if (c === 'PLN') return amount.toLocaleString('pl-PL') + ' zł';
+  return amount.toLocaleString('pl-PL') + ' ' + c;
+}
+function fmtDate(s) {
+  try { return new Date(s).toLocaleString('pl-PL'); } catch (e) { return String(s || ''); }
+}
+
+async function loadOrders() {
+  if (!el.ordersBox) return;
+  try {
+    const orders = await api('/api/orders');
+    renderOrders(Array.isArray(orders) ? orders : []);
+  } catch (err) {
+    if (el.ordersCount) el.ordersCount.textContent = '0';
+    el.ordersBox.innerHTML = `<p class="hint">Nie udało się pobrać zamówień: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderOrders(orders) {
+  if (el.ordersCount) el.ordersCount.textContent = String(orders.length);
+  if (!orders.length) {
+    el.ordersBox.innerHTML = '<p class="hint">Brak zamówień. Pojawią się tu po pierwszej udanej płatności.</p>';
+    return;
+  }
+  el.ordersBox.innerHTML = orders.map((o) => {
+    const items = (Array.isArray(o.items) ? o.items : [])
+      .map((it) => `${escapeHtml(it.name)} × ${it.qty}`).join(', ');
+    const ship = o.shipping && o.shipping.address ? o.shipping.address : null;
+    const shipLine = ship
+      ? [ship.line1, ship.line2, `${ship.postal_code || ''} ${ship.city || ''}`.trim(), ship.country]
+        .filter(Boolean).map(escapeHtml).join(', ')
+      : '';
+    return `<div class="order-row" style="border:1px solid var(--line,#333);border-radius:12px;padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+        <strong>${fmtGrosze(o.amount_total, o.currency)}</strong>
+        <span class="hint">${fmtDate(o.created_at)}</span>
+      </div>
+      <div class="hint" style="margin-top:6px">${escapeHtml(o.customer_name || '')}${o.email ? ' · ' + escapeHtml(o.email) : ''}</div>
+      <div style="margin-top:6px">${escapeHtml(items)}</div>
+      ${shipLine ? `<div class="hint" style="margin-top:6px">Wysyłka: ${shipLine}</div>` : ''}
+      <div class="hint" style="margin-top:6px;opacity:.6;font-size:.82em">${escapeHtml(o.status)} · ${escapeHtml(o.id)}</div>
+    </div>`;
+  }).join('');
+}
+
+if (el.ordersReload) el.ordersReload.addEventListener('click', loadOrders);
 
 /* start */
 renderGallery();   // pokaż pusty edytor galerii (kafel „+")

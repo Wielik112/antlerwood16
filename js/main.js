@@ -299,11 +299,18 @@ function initCart(){
   document.getElementById('cartCheckout')?.addEventListener('click',()=>{
     window.location.href='koszyk.html';
   });
-  // pełna strona koszyka -> kasa (demo)
-  document.getElementById('csCheckout')?.addEventListener('click',()=>{
-    if(CART.length===0) return;
-    showToast(tr('cart.demo'));
+  // pełna strona koszyka -> kasa Stripe (prawdziwa płatność)
+  document.getElementById('csCheckout')?.addEventListener('click',function(){
+    startCheckout(this);
   });
+
+  // powrót ze Stripe po anulowaniu płatności (?canceled=1 na koszyk.html)
+  try{
+    if(new URLSearchParams(location.search).get('canceled')){
+      showToast(tr('cart.canceled'));
+      history.replaceState(null,'',location.pathname);
+    }
+  }catch(e){}
 
   // strona produktu (PDP): stepper + dodaj do koszyka
   const pdpAdd=document.getElementById('pdpAdd');
@@ -450,6 +457,81 @@ async function loadProductsFromApi(){
   return false;
 }
 
+/* ---------------- PŁATNOŚCI (STRIPE CHECKOUT) ---------------- */
+/* Wysyła koszyk do /api/checkout (backend liczy ceny z bazy — bezpiecznie),
+   dostaje adres hostowanej strony płatności Stripe i tam przekierowuje.
+   Po opłaceniu Stripe wraca na dziekujemy.html?session_id=... */
+async function startCheckout(btn){
+  if(CART.length===0) return;
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = tr('cart.redirect'); }
+  try{
+    const res = await fetch('/api/checkout', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        items: CART.map(i=>({ id:i.id, qty:i.qty })),
+        lang: LANG,
+      }),
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && data && data.url){
+      window.location.href = data.url;   // → hostowana strona płatności Stripe
+      return;
+    }
+    showToast((data && data.error) || tr('cart.checkoutErr'));
+  }catch(e){
+    showToast(tr('cart.checkoutErr'));
+  }
+  if(btn){ btn.disabled = false; btn.textContent = orig; }
+}
+
+/* Strona potwierdzenia (dziekujemy.html): potwierdza płatność w backendzie,
+   pokazuje podsumowanie i czyści koszyk. */
+async function renderThankYou(){
+  const root = document.getElementById('thanksRoot');
+  if(!root) return;
+  const sid = new URLSearchParams(location.search).get('session_id');
+  const box = document.getElementById('thanksBox');
+
+  if(!sid){
+    if(box) box.innerHTML = `<p>${tr('thanks.missing')}</p>
+      <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+    return;
+  }
+  try{
+    const res = await fetch('/api/order?session_id='+encodeURIComponent(sid));
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && data && data.paid){
+      // płatność potwierdzona — wyczyść koszyk
+      CART = []; saveCart(); updateCartUI();
+      const total = (data.amount_total/100).toLocaleString('pl-PL') + ' zł';
+      const lines = (data.items||[]).map(it=>
+        `<div class="cs-row"><span>${it.name} × ${it.qty}</span><span>${(it.amount/100).toLocaleString('pl-PL')} zł</span></div>`
+      ).join('');
+      if(box) box.innerHTML = `
+        <div class="thanks-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h1>${tr('thanks.title')}</h1>
+        <p>${tr('thanks.body')}${data.email ? ' <b>'+data.email+'</b>' : ''}.</p>
+        <div class="thanks-summary">
+          ${lines}
+          <div class="cs-total"><span>${tr('cartp.total')}</span><span>${total}</span></div>
+        </div>
+        <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+    }else{
+      if(box) box.innerHTML = `<h1>${tr('thanks.pendingTitle')}</h1>
+        <p>${tr('thanks.pending')}</p>
+        <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+    }
+  }catch(e){
+    if(box) box.innerHTML = `<h1>${tr('thanks.pendingTitle')}</h1>
+      <p>${tr('thanks.pending')}</p>
+      <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+  }
+}
+
 /* ---------------- DYNAMICZNA STRONA PRODUKTU (produkt.html?id=...) ---------------- */
 function renderPdp(){
   const root = document.getElementById('pdpRoot');
@@ -570,6 +652,8 @@ window.addEventListener('DOMContentLoaded',async ()=>{
   }
   // dynamiczna strona produktu (produkt.html) — renderuj po pobraniu danych
   renderPdp();
+  // strona potwierdzenia płatności (dziekujemy.html)
+  renderThankYou();
 });
 window.addEventListener('scroll',revealScan,{passive:true});
 window.addEventListener('load',revealScan);

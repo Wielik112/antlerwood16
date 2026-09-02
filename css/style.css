@@ -636,3 +636,18 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:64px 0 34px;posi
   .person-row.reverse .person-text{order:0}
   .person-photo .about-photo-inner{aspect-ratio:4/3}
 }
+
+/* ---------- Strona potwierdzenia płatności (dziekujemy.html) ---------- */
+.thanks{max-width:640px;margin:0 auto;text-align:center;padding:20px 0}
+.thanks h1{font-family:'Rye',serif;font-size:2.2rem;color:var(--cream);margin:18px 0 12px}
+.thanks p{color:var(--bone);opacity:.9;line-height:1.6;margin:0 auto 26px;max-width:520px}
+.thanks .btn-primary{border:0}
+.thanks-loading{color:var(--muted);padding:60px 0;font-family:'Oswald';letter-spacing:.06em}
+.thanks-check{width:76px;height:76px;margin:0 auto;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(200,146,90,.14);border:2px solid var(--bronze)}
+.thanks-check svg{width:38px;height:38px;color:var(--bronze-lt)}
+.thanks-summary{text-align:left;max-width:460px;margin:0 auto 28px;padding:22px 24px;
+  border:1px solid var(--line);border-radius:16px;background:rgba(20,12,6,.5)}
+.thanks-summary .cs-row{margin-bottom:12px}
+.thanks-summary .cs-total{margin-top:8px}
