@@ -28,7 +28,8 @@ function validate(body, { requireId } = {}) {
   const cat = CATS.includes(body.cat) ? body.cat : 'wood';
   const art = ARTS.includes(body.art) ? body.art : (cat === 'wood' ? 'w1' : 'a1');
   const price = Math.max(0, Math.round(Number(body.price) || 0));
-  const descr = String(body.desc || '').trim();
+  const descr = String(body.desc || '').trim();       // opis główny (krótki)
+  const descFull = String(body.descFull || '').trim(); // opis produktu (pełny)
   const img = String(body.img || '').trim();
   const tag = String(body.tag || '').trim();
 
@@ -36,7 +37,7 @@ function validate(body, { requireId } = {}) {
   if (!id && requireId) id = slugify(name);
   if (requireId && !id) return { error: 'Nie udało się utworzyć identyfikatora (id) z nazwy.' };
 
-  return { data: { id, name, cat, tag, price, descr, art, img } };
+  return { data: { id, name, cat, tag, price, descr, descFull, art, img } };
 }
 
 module.exports = wrap(async function handler(req, res) {
@@ -65,9 +66,9 @@ module.exports = wrap(async function handler(req, res) {
     // Produkt tworzymy z pustym img — zdjęcie(a) trafiają do galerii (product_photos),
     // a products.img jest z niej wyliczane (pierwsze zdjęcie = główne).
     const { rows } = await sql`
-      INSERT INTO products (id, name, cat, tag, price, descr, art, img, sort_order)
+      INSERT INTO products (id, name, cat, tag, price, descr, desc_full, art, img, sort_order)
       VALUES (${data.id}, ${data.name}, ${data.cat}, ${data.tag}, ${data.price},
-              ${data.descr}, ${data.art}, '', ${sortOrder})
+              ${data.descr}, ${data.descFull}, ${data.art}, '', ${sortOrder})
       RETURNING *;
     `;
     let row = rows[0];

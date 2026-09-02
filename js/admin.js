@@ -34,7 +34,7 @@ const el = {
 
 const f = {
   name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
-  desc: $('f-desc'), art: $('f-art'), id: $('f-id'),
+  desc: $('f-desc'), descFull: $('f-descfull'), art: $('f-art'), id: $('f-id'),
 };
 const gal = {
   main: $('galMain'),
@@ -329,6 +329,7 @@ function fillForm(p) {
   f.cat.value = p.cat || 'wood';
   f.price.value = p.price != null ? p.price : '';
   f.desc.value = p.desc || '';
+  f.descFull.value = p.descFull || '';
   f.art.value = p.art || 'w1';
   f.id.value = p.id || '';
 
@@ -406,6 +407,7 @@ el.productForm.addEventListener('submit', async (e) => {
     cat: f.cat.value,
     price: Number(f.price.value) || 0,
     desc: f.desc.value.trim(),
+    descFull: f.descFull.value.trim(),
     art: f.art.value,
     id: f.id.value.trim(),
   };

@@ -57,7 +57,8 @@ function trOr(key, fallback){
 }
 /* nazwa/opis produktu w bieżącym języku (fallback do danych z bazy/PRODUCTS) */
 function pName(p){ return trOr('p.'+p.id+'.name', p.name); }
-function pDesc(p){ return trOr('p.'+p.id+'.desc', p.desc); }
+function pDesc(p){ return trOr('p.'+p.id+'.desc', p.desc); }          // opis główny (krótki)
+function pDescFull(p){ return trOr('p.'+p.id+'.descFull', p.descFull || p.desc); } // opis produktu (pełny; fallback na główny)
 function pTag(p){ return p.cat==='wood' ? tr('filter.wood') : tr('filter.antler'); }
 
 /* podmień wszystkie elementy z data-i18n / data-i18n-ph */
@@ -504,7 +505,7 @@ function renderPdp(){
         <div class="kick">${tr(catKey)}</div>
         <h1>${pName(p)}</h1>
         <div class="pdp-price">${fmtPrice(p.price)}</div>
-        <p class="pdp-desc">${pDesc(p)}</p>
+        <p class="pdp-desc">${pDescFull(p)}</p>
         <div class="pdp-actions">
           <div class="qty-stepper">
             <button type="button" class="qty-btn" id="pdpDec" aria-label="Mniej">–</button>
