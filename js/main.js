@@ -21,8 +21,22 @@ let PRODUCTS = [
   {id:"stolek-poroze",name:"Stołek z poroża",cat:"antler",art:"a2",tag:"Poroże",price:1150,desc:"Stołek wykonany w całości z użyciem poroża, rzeźbiarska forma użytkowa.",img:"https://images.unsplash.com/photo-1503602642458-232111445657?w=800&q=80&auto=format&fit=crop"},
 ];
 
-/* format ceny w PLN */
-function fmtPrice(v){ return v.toLocaleString('pl-PL') + ' zł'; }
+/* Przelicznik PLN → EUR. Ceny w bazie/panelu podawane są w złotówkach;
+   przy języku EN/DE są automatycznie przeliczane na euro. Zmień wartość,
+   gdy kurs się zmieni (ile złotych za 1 euro). */
+const PLN_PER_EUR = 4.30;
+
+/* Format ceny zależny od wybranego języka:
+   - PL  → złotówki (waluta bazowa),
+   - EN  → euro, symbol z przodu (€1,234),
+   - DE  → euro, symbol z tyłu (1.234 €). */
+function fmtPrice(v){
+  const pln = Number(v) || 0;
+  if(LANG === 'pl') return pln.toLocaleString('pl-PL') + ' zł';
+  const eur = Math.round(pln / PLN_PER_EUR);
+  if(LANG === 'de') return eur.toLocaleString('de-DE') + ' €';
+  return '€' + eur.toLocaleString('en-IE'); // en
+}
 
 /* ================= I18N (PL / EN / DE) ================= */
 const LANG_KEY = 'antlerwood_lang';
@@ -78,7 +92,7 @@ function applyTranslations(){
   // etykieta przełącznika
   const label = document.getElementById('langLabel');
   if(label) label.textContent = LANG.toUpperCase();
-  // ceny z data-price (PDP, related) sformatuj wg języka (waluta zł niezmienna)
+  // ceny z data-price (PDP, related) sformatuj wg języka (PL→zł, EN/DE→€)
   document.querySelectorAll('[data-price]').forEach(el=>{
     const v = parseFloat(el.getAttribute('data-price'));
     if(!isNaN(v)) el.textContent = fmtPrice(v);
