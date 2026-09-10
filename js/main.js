@@ -317,6 +317,8 @@ function initCart(){
   document.getElementById('csCheckout')?.addEventListener('click',function(){
     startCheckout(this);
   });
+  // polskie bramki (Przelewy24 / PayU / Tpay) — pokazują się, gdy skonfigurowane
+  initPayMethods();
 
   // powrót ze Stripe po anulowaniu płatności (?canceled=1 na koszyk.html)
   try{
@@ -500,14 +502,120 @@ async function startCheckout(btn){
   if(btn){ btn.disabled = false; btn.textContent = orig; }
 }
 
+/* ---------------- POLSKIE BRAMKI (PRZELEWY24 / PAYU / TPAY) ---------------- */
+/* Pobiera koszyk + dane do wysyłki i tworzy płatność w wybranej bramce
+   (/api/pay/create liczy kwotę z bazy). Backend zwraca adres bramki. */
+let PAY_PROVIDER = null;
+
+async function startPayment(provider, btn){
+  if(CART.length===0){ showToast(tr('cart.empty')); return; }
+  const emailEl = document.getElementById('payEmail');
+  const email = (emailEl?.value || '').trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    showToast(tr('pay.emailErr')); emailEl?.focus(); return;
+  }
+  const name = (document.getElementById('payName')?.value || '').trim();
+  const region = document.getElementById('payRegion')?.value || 'pl';
+  const address = (document.getElementById('payAddress')?.value || '').trim();
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = tr('cart.redirect'); }
+  try{
+    const res = await fetch('/api/pay/create', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        items: CART.map(i=>({ id:i.id, qty:i.qty })),
+        provider, email, name, region, address, lang: LANG,
+      }),
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && data && data.url){ window.location.href = data.url; return; }
+    showToast((data && data.error) || tr('cart.checkoutErr'));
+  }catch(e){
+    showToast(tr('cart.checkoutErr'));
+  }
+  if(btn){ btn.disabled = false; btn.textContent = orig; }
+}
+
+/* Na stronie koszyka: pokaż tylko te bramki, które są skonfigurowane w backendzie. */
+async function initPayMethods(){
+  const box  = document.getElementById('payMethods');
+  const btns = document.getElementById('payBtns');
+  const form = document.getElementById('payForm');
+  if(!box || !btns || !form) return;
+  let providers = [];
+  try{
+    const res = await fetch('/api/pay/methods', { headers:{ 'Accept':'application/json' } });
+    const data = await res.json().catch(()=>({}));
+    providers = Array.isArray(data.providers) ? data.providers : [];
+  }catch(e){ /* brak API — zostaje sam Stripe */ }
+  if(providers.length === 0) return;
+  box.hidden = false;
+  btns.innerHTML = providers.map(p=>
+    `<button type="button" class="pay-method" data-provider="${p.id}">${p.label}</button>`
+  ).join('');
+  btns.querySelectorAll('.pay-method').forEach(b=>{
+    b.addEventListener('click',()=>{
+      PAY_PROVIDER = b.dataset.provider;
+      btns.querySelectorAll('.pay-method').forEach(x=>x.classList.toggle('active', x===b));
+      form.hidden = false;
+      document.getElementById('payEmail')?.focus();
+    });
+  });
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!PAY_PROVIDER){ showToast(tr('pay.choose')); return; }
+    startPayment(PAY_PROVIDER, document.getElementById('paySubmit'));
+  });
+}
+
+/* Potwierdzenie zamówienia z polskiej bramki (dziekujemy.html?order=...).
+   Powiadomienie z bramki (IPN) bywa opóźnione — kilka prób zanim uznamy „pending". */
+async function renderThankYouOrder(orderId, box){
+  const showPaid = (data)=>{
+    CART = []; saveCart(); updateCartUI();
+    const total = (data.amount_total/100).toLocaleString('pl-PL') + ' zł';
+    const lines = (data.items||[]).map(it=>
+      `<div class="cs-row"><span>${it.name} × ${it.qty}</span><span>${(it.amount/100).toLocaleString('pl-PL')} zł</span></div>`
+    ).join('');
+    if(box) box.innerHTML = `
+      <div class="thanks-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h1>${tr('thanks.title')}</h1>
+      <p>${tr('thanks.body')}${data.email ? ' <b>'+data.email+'</b>' : ''}.</p>
+      <div class="thanks-summary">
+        ${lines}
+        <div class="cs-total"><span>${tr('cartp.total')}</span><span>${total}</span></div>
+      </div>
+      <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+  };
+  for(let attempt=0; attempt<4; attempt++){
+    try{
+      const res = await fetch('/api/pay/status?order='+encodeURIComponent(orderId));
+      const data = await res.json().catch(()=>({}));
+      if(res.ok && data && data.paid){ showPaid(data); return; }
+    }catch(e){}
+    if(attempt < 3) await new Promise(r=>setTimeout(r, 2000));
+  }
+  if(box) box.innerHTML = `<h1>${tr('thanks.pendingTitle')}</h1>
+    <p>${tr('thanks.pending')}</p>
+    <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;
+}
+
 /* Strona potwierdzenia (dziekujemy.html): potwierdza płatność w backendzie,
    pokazuje podsumowanie i czyści koszyk. */
 async function renderThankYou(){
   const root = document.getElementById('thanksRoot');
   if(!root) return;
-  const sid = new URLSearchParams(location.search).get('session_id');
+  const params = new URLSearchParams(location.search);
   const box = document.getElementById('thanksBox');
 
+  // Powrót z polskiej bramki (Przelewy24 / PayU / Tpay): potwierdzamy po naszym id.
+  const orderId = params.get('order');
+  if(orderId){ return renderThankYouOrder(orderId, box); }
+
+  const sid = params.get('session_id');
   if(!sid){
     if(box) box.innerHTML = `<p>${tr('thanks.missing')}</p>
       <a class="btn btn-primary" href="sklep.html">${tr('thanks.shop')}</a>`;

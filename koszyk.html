@@ -71,6 +71,39 @@
         <div class="cs-row"><span data-i18n="cartp.shipping">Shipping</span><span data-i18n="cartp.shipCalc">Calculated at checkout</span></div>
         <div class="cs-total"><span data-i18n="cartp.total">Total</span><span id="csTotal">0 zł</span></div>
         <button class="btn btn-primary" id="csCheckout" type="button" data-i18n="cartp.checkout">Checkout</button>
+
+        <!-- Polskie bramki (Przelewy24 / PayU / Tpay). Pojawiają się tylko, gdy są
+             skonfigurowane w backendzie (GET /api/pay/methods). -->
+        <div class="pay-methods" id="payMethods" hidden>
+          <div class="pay-or" data-i18n="pay.or">or pay with</div>
+          <div class="pay-btns" id="payBtns"></div>
+        </div>
+
+        <!-- Dane do wysyłki dla polskich bramek (Stripe zbiera je u siebie). -->
+        <form class="pay-form" id="payForm" hidden>
+          <label class="pay-field">
+            <span data-i18n="pay.email">E-mail (do potwierdzenia)</span>
+            <input type="email" id="payEmail" required autocomplete="email" placeholder="jan@example.com">
+          </label>
+          <label class="pay-field">
+            <span data-i18n="pay.name">Imię i nazwisko</span>
+            <input type="text" id="payName" autocomplete="name">
+          </label>
+          <label class="pay-field">
+            <span data-i18n="pay.region">Region wysyłki</span>
+            <select id="payRegion">
+              <option value="pl" data-i18n="pay.regionPl">Polska — 19 zł</option>
+              <option value="eu" data-i18n="pay.regionEu">Europa (UE) — 49 zł</option>
+              <option value="world" data-i18n="pay.regionWorld">Świat — 99 zł</option>
+            </select>
+          </label>
+          <label class="pay-field">
+            <span data-i18n="pay.address">Adres dostawy</span>
+            <textarea id="payAddress" rows="3" placeholder="Ulica, nr, kod pocztowy, miasto, kraj"></textarea>
+          </label>
+          <button class="btn btn-primary" id="paySubmit" type="submit" data-i18n="pay.pay">Zapłać</button>
+        </form>
+
         <a href="sklep.html" class="cs-continue" data-i18n="cartp.continue">Continue shopping</a>
         <p class="cs-note" data-i18n="cartp.note">Secure payments. Worldwide shipping.</p>
       </aside>
