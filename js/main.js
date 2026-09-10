@@ -104,8 +104,11 @@ function setLang(lang){
   if(!SUPPORTED_LANGS.includes(lang)) return;
   LANG = lang; saveLang();
   applyTranslations();
-  // przerenderuj dynamiczne fragmenty
+  // przerenderuj dynamiczne fragmenty (od razu, bez odświeżania strony)
   if(document.getElementById('grid')) renderProducts();
+  // dynamiczna strona produktu (produkt.html?id=...): nazwa, opis i cena
+  // budowane są w JS, więc trzeba je przerenderować przy zmianie języka
+  if(document.getElementById('pdpRoot')) renderPdp();
   updateCartUI();
 }
 
