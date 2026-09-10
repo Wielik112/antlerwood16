@@ -651,3 +651,25 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:64px 0 34px;posi
   border:1px solid var(--line);border-radius:16px;background:rgba(20,12,6,.5)}
 .thanks-summary .cs-row{margin-bottom:12px}
 .thanks-summary .cs-total{margin-top:8px}
+
+/* ---- Polskie bramki płatności (koszyk) ---- */
+.pay-methods{margin-top:18px}
+.pay-or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.82rem;
+  text-transform:uppercase;letter-spacing:.08em;margin:6px 0 14px}
+.pay-or::before,.pay-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.pay-btns{display:flex;flex-wrap:wrap;gap:10px}
+.pay-method{flex:1 1 auto;min-width:110px;padding:11px 14px;cursor:pointer;
+  background:var(--plank2);color:var(--bone);border:1px solid var(--line);border-radius:10px;
+  font:inherit;font-weight:600;letter-spacing:.02em;transition:.18s}
+.pay-method:hover{border-color:var(--bronze);color:var(--cream)}
+.pay-method.active{border-color:var(--bronze-lt);background:rgba(200,146,90,.14);color:var(--cream)}
+.pay-form{margin-top:18px;display:grid;gap:14px}
+.pay-field{display:grid;gap:6px}
+.pay-field>span{font-size:.82rem;color:var(--muted);letter-spacing:.02em}
+.pay-field input,.pay-field select,.pay-field textarea{width:100%;padding:11px 13px;
+  background:var(--char);color:var(--cream);border:1px solid var(--line);border-radius:10px;
+  font:inherit;transition:.18s}
+.pay-field input:focus,.pay-field select:focus,.pay-field textarea:focus{
+  outline:none;border-color:var(--bronze)}
+.pay-field textarea{resize:vertical;min-height:70px}
+.pay-form .btn-primary{margin-top:4px}

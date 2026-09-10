@@ -142,6 +142,11 @@ async function ensureSchema() {
     );
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_created ON orders (created_at DESC);`;
+  // Obsługa wielu bramek płatności (Stripe / Przelewy24 / PayU / Tpay).
+  // provider      = nazwa bramki, przez którą powstało zamówienie,
+  // provider_ref  = identyfikator transakcji po stronie bramki (token/orderId/tr_id).
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe';`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_ref TEXT NOT NULL DEFAULT '';`;
 
   await migratePhotos();
   tableReady = true;
@@ -486,6 +491,52 @@ async function recordOrder(session) {
   `;
 }
 
+// ---------- Zamówienia dla polskich bramek (Przelewy24 / PayU / Tpay) ----------
+
+// Wspólny cennik wysyłki (grosze). Używany przez Stripe (jako shipping_options)
+// oraz przez polskie bramki (kwota doliczana po stronie serwera przy tworzeniu płatności).
+const SHIPPING_RATES = {
+  pl:    { amount: 1900, label: 'Polska — kurier' },
+  eu:    { amount: 4900, label: 'Europa (UE)' },
+  world: { amount: 9900, label: 'Świat (Worldwide)' },
+};
+function shippingRate(region) {
+  return SHIPPING_RATES[String(region || 'pl').toLowerCase()] || SHIPPING_RATES.pl;
+}
+
+// Zapis zamówienia „w trakcie płatności" (status = pending) zanim przekierujemy
+// klienta do bramki. Kwota (grosze) policzona wcześniej z bazy — nie z przeglądarki.
+async function insertPendingOrder({ id, provider, amount, currency = 'pln', items = [], shipping = {}, email = '', name = '' }) {
+  await sql`
+    INSERT INTO orders (id, provider, email, customer_name, amount_total, currency, status, items, shipping)
+    VALUES (${id}, ${provider}, ${email}, ${name}, ${amount}, ${currency}, 'pending', ${JSON.stringify(items)}, ${JSON.stringify(shipping)})
+    ON CONFLICT (id) DO UPDATE SET
+      provider = EXCLUDED.provider,
+      amount_total = EXCLUDED.amount_total,
+      items = EXCLUDED.items,
+      shipping = EXCLUDED.shipping,
+      email = EXCLUDED.email,
+      customer_name = EXCLUDED.customer_name;
+  `;
+}
+
+// Oznacz zamówienie jako opłacone (po zweryfikowanym powiadomieniu z bramki).
+async function markOrderPaid(id, providerRef = '') {
+  await sql`
+    UPDATE orders SET status = 'paid', provider_ref = ${providerRef}
+    WHERE id = ${id} AND status <> 'paid';
+  `;
+}
+
+// Odczyt pojedynczego zamówienia (dla strony „dziękujemy").
+async function getOrder(id) {
+  const { rows } = await sql`
+    SELECT id, provider, status, amount_total, currency, email, customer_name, items
+    FROM orders WHERE id = ${id};
+  `;
+  return rows.length ? rows[0] : null;
+}
+
 // Odczyt surowego (nieparsowanego) body — potrzebne do weryfikacji podpisu webhooka.
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -536,6 +587,11 @@ module.exports = {
   getStripe,
   recordOrder,
   readRawBody,
+  SHIPPING_RATES,
+  shippingRate,
+  insertPendingOrder,
+  markOrderPaid,
+  getOrder,
   DB_URL_KEYS,
   COOKIE_NAME,
 };

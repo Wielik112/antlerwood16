@@ -6,7 +6,11 @@
     { "source": "/api/logout", "destination": "/api/auth?action=logout" },
     { "source": "/api/session", "destination": "/api/auth?action=session" },
     { "source": "/api/products/:id", "destination": "/api/products?id=:id" },
-    { "source": "/api/photos/:id", "destination": "/api/photos?id=:id" }
+    { "source": "/api/photos/:id", "destination": "/api/photos?id=:id" },
+    { "source": "/api/pay/methods", "destination": "/api/pay?action=methods" },
+    { "source": "/api/pay/create", "destination": "/api/pay?action=create" },
+    { "source": "/api/pay/notify", "destination": "/api/pay?action=notify" },
+    { "source": "/api/pay/status", "destination": "/api/pay?action=status" }
   ],
   "headers": [
     {
