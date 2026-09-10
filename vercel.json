@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/api/login", "destination": "/api/auth?action=login" },
+    { "source": "/api/logout", "destination": "/api/auth?action=logout" },
+    { "source": "/api/session", "destination": "/api/auth?action=session" },
+    { "source": "/api/products/:id", "destination": "/api/products?id=:id" },
+    { "source": "/api/photos/:id", "destination": "/api/photos?id=:id" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

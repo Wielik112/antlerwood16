@@ -197,13 +197,17 @@ jednym koncie Vercel — nie trzeba osobnego serwera (Railway itp.).
 ```
 api/
 ├── _lib.js            # połączenie z bazą, tworzenie tabeli, logowanie (podpisane ciasteczko)
-├── login.js           # POST /api/login   — logowanie hasłem
-├── logout.js          # POST /api/logout
-├── session.js         # GET  /api/session — czy zalogowany
-├── products.js        # GET (lista, publiczne) + POST (dodanie, admin)
-├── products/[id].js   # GET / PUT / DELETE pojedynczego produktu
+├── auth.js            # /api/login, /api/logout, /api/session (przez rewrites w vercel.json)
+├── products.js        # GET (lista) + POST (dodanie) oraz GET/PUT/DELETE /api/products/:id
+├── photos.js          # POST/PUT galerii oraz GET/DELETE /api/photos/:id
+├── img/[id].js        # GET /api/img/:id — serwuje zdjęcie produktu z bazy
 └── seed.js            # POST /api/seed — jednorazowy import startowych 9 produktów
 ```
+
+Adresy `/api/login`, `/api/logout`, `/api/session`, `/api/products/:id` i
+`/api/photos/:id` działają jak wcześniej — w `vercel.json` są przepisywane
+(rewrites) na połączone funkcje. Połączenie kilku endpointów w jedną funkcję
+mieści projekt w limicie **12 funkcji serverless** na planie Hobby na Vercelu.
 
 ### Konfiguracja krok po kroku (na Vercelu)
 1. **Wgraj repo na Vercel** (Add New… → Project → import z GitHuba). Framework Preset: **Other**.
