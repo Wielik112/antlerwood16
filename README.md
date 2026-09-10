@@ -84,7 +84,8 @@ Przełącznik języka jest w prawym górnym rogu: polski, angielski, niemiecki.
 - Wszystkie tłumaczenia są w `js/i18n.js` (obiekt `window.I18N`, klucz `{pl, en, de}`).
   Aby poprawić tekst, znajdź jego klucz i zmień wartość dla danego języka.
 - W HTML tekst do tłumaczenia ma atrybut `data-i18n="klucz"` (placeholdery: `data-i18n-ph`).
-- Ceny są w zł we wszystkich językach (do zmiany w `js/i18n.js`, sekcja `I18N_CURRENCY`).
+- Ceny są w zł przy języku polskim, a przy EN/DE automatycznie przeliczane na euro
+  (przelicznik `PLN_PER_EUR` w `js/main.js`, funkcja `fmtPrice`).
 
 ### Koszyk (sklep)
 Sklep ma działający koszyk: dodawanie produktów, zmiana ilości, usuwanie i podsumowanie kwoty.

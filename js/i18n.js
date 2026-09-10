@@ -652,4 +652,7 @@ window.I18N = {
 "lang.de": "Deutsch"
 }
 };
-window.I18N_CURRENCY = {"pl": {"suffix": " zł", "prefix": ""}, "en": {"suffix": " zł", "prefix": ""}, "de": {"suffix": " zł", "prefix": ""}};
+/* Waluta zależna od języka. Ceny w bazie/panelu są w złotówkach; przy EN/DE
+   są przeliczane na euro (przelicznik PLN_PER_EUR w js/main.js, funkcja fmtPrice).
+   PL → zł, EN → € z przodu, DE → € z tyłu. */
+window.I18N_CURRENCY = {"pl": {"suffix": " zł", "prefix": ""}, "en": {"suffix": "", "prefix": "€"}, "de": {"suffix": " €", "prefix": ""}};
