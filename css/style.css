@@ -462,6 +462,12 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:64px 0 34px;posi
   color:var(--cream);line-height:1.05;margin-bottom:18px}
 .pdp-price{font-family:'Oswald';font-weight:600;font-size:2rem;color:var(--bronze-lt);margin-bottom:24px}
 .pdp-desc{color:var(--bone);opacity:.9;font-size:1.1rem;line-height:1.7;margin-bottom:28px;white-space:pre-line}
+.pdp-specs{list-style:none;margin:0 0 30px;padding:18px 0 4px;border-top:1px solid rgba(255,255,255,.08)}
+.pdp-specs li{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:1rem}
+.pdp-specs li span{color:var(--muted);font-family:'Oswald',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+.pdp-specs li b{color:var(--bone);font-weight:500}
+.pdp-specs .in-stock{color:#8fce79}
+.pdp-specs .out-stock{color:#e8927c}
 .pdp-feats{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:34px}
 .pdp-feats li{display:flex;align-items:center;gap:12px;color:var(--bone);font-size:1rem}
 .pdp-feats svg{width:20px;height:20px;color:var(--bronze);flex:0 0 auto}

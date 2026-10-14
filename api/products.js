@@ -9,7 +9,7 @@
 // liczbę funkcji serverless (limit 12 na planie Hobby na Vercelu).
 const {
   sql, ensureSchema, rowToProduct, requireAuth, readJson, wrap,
-  addPhoto, syncMainImage, attachPhotos, isDataUrl,
+  addPhoto, syncMainImage, attachPhotos, isDataUrl, translateDescriptions,
 } = require('./_lib');
 
 const CATS = ['wood', 'antler'];
@@ -39,11 +39,23 @@ function validate(body, { requireId } = {}) {
   const img = String(body.img || '').trim();
   const tag = String(body.tag || '').trim();
 
+  // ilość sztuk (domyślnie 1) oraz wymiary w cm (opcjonalne)
+  const numOrNull = (v) => {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  };
+  const stock = (body.stock === '' || body.stock == null)
+    ? 1 : Math.max(0, Math.round(Number(body.stock)) || 0);
+  const dimH = numOrNull(body.dimH);
+  const dimW = numOrNull(body.dimW);
+  const dimD = numOrNull(body.dimD);
+
   let id = String(body.id || '').trim();
   if (!id && requireId) id = slugify(name);
   if (requireId && !id) return { error: 'Nie udało się utworzyć identyfikatora (id) z nazwy.' };
 
-  return { data: { id, name, cat, tag, price, descr, descFull, art, img } };
+  return { data: { id, name, cat, tag, price, descr, descFull, art, img, stock, dimH, dimW, dimD } };
 }
 
 module.exports = wrap(async function handler(req, res) {
@@ -66,6 +78,9 @@ module.exports = wrap(async function handler(req, res) {
       const { data, error } = validate(body);
       if (error) return res.status(400).json({ error });
 
+      // Automatyczne tłumaczenie opisów na EN/DE (best-effort, fallback = PL).
+      const tr = await translateDescriptions(data.descr, data.descFull);
+
       // Zdjęcie główne (products.img) jest wyliczane z galerii — nie nadpisujemy go tutaj
       // danymi tekstowymi formularza. Aktualizujemy tylko pozostałe pola produktu.
       const { rows } = await sql`
@@ -76,6 +91,14 @@ module.exports = wrap(async function handler(req, res) {
           price = ${data.price},
           descr = ${data.descr},
           desc_full = ${data.descFull},
+          descr_en = ${tr.descEn},
+          descr_de = ${tr.descDe},
+          desc_full_en = ${tr.descFullEn},
+          desc_full_de = ${tr.descFullDe},
+          stock = ${data.stock},
+          dim_h = ${data.dimH},
+          dim_w = ${data.dimW},
+          dim_d = ${data.dimD},
           art = ${data.art}
         WHERE id = ${id}
         RETURNING *;
@@ -125,12 +148,18 @@ module.exports = wrap(async function handler(req, res) {
     const ord = await sql`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM products;`;
     const sortOrder = ord.rows[0].next;
 
+    // Automatyczne tłumaczenie opisów na EN/DE (best-effort, fallback = PL).
+    const tr = await translateDescriptions(data.descr, data.descFull);
+
     // Produkt tworzymy z pustym img — zdjęcie(a) trafiają do galerii (product_photos),
     // a products.img jest z niej wyliczane (pierwsze zdjęcie = główne).
     const { rows } = await sql`
-      INSERT INTO products (id, name, cat, tag, price, descr, desc_full, art, img, sort_order)
+      INSERT INTO products (id, name, cat, tag, price, descr, desc_full, art, img, sort_order,
+        descr_en, descr_de, desc_full_en, desc_full_de, stock, dim_h, dim_w, dim_d)
       VALUES (${data.id}, ${data.name}, ${data.cat}, ${data.tag}, ${data.price},
-              ${data.descr}, ${data.descFull}, ${data.art}, '', ${sortOrder})
+              ${data.descr}, ${data.descFull}, ${data.art}, '', ${sortOrder},
+              ${tr.descEn}, ${tr.descDe}, ${tr.descFullEn}, ${tr.descFullDe},
+              ${data.stock}, ${data.dimH}, ${data.dimW}, ${data.dimD})
       RETURNING *;
     `;
     let row = rows[0];

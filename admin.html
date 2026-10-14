@@ -118,21 +118,21 @@
   .status.other{border-color:var(--line);color:var(--muted)}
   /* ---------- modal (pełny ekran) ---------- */
   .modal-overlay{position:fixed;inset:0;background:rgba(10,7,5,.72);backdrop-filter:blur(3px);z-index:50;
-    display:flex;align-items:center;justify-content:center;padding:20px}
-  @media(max-width:640px){.modal-overlay{padding:0}}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(1080px,100%);
-    height:min(94vh,920px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
-  @media(max-width:640px){.modal{height:100vh;border-radius:0;border:none}}
+    display:flex;align-items:stretch;justify-content:center}
+  .modal{background:var(--panel);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--line);background:var(--panel2)}
   .modal-head h2{margin:0;font-size:20px;letter-spacing:.04em}
   .modal-close{background:transparent;border:1px solid var(--line);color:var(--muted);width:38px;height:38px;border-radius:9px;
     font-size:22px;line-height:1;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
   .modal-close:hover{background:var(--panel3);color:var(--text)}
   .modal-body{padding:24px;overflow:auto;flex:1}
+  .modal-body .form-grid{max-width:1100px;margin:0 auto}
   .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--line);background:var(--panel2)}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
   @media(max-width:820px){.form-grid{grid-template-columns:1fr;gap:20px}}
   .form-sec-label{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .dims-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .gal-sublabel{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
   /* ---------- galeria zdjęć w formularzu ---------- */
   .gallery-editor{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
   .gallery-main{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;border:1px solid var(--line);
@@ -142,6 +142,9 @@
   .gallery-main-badge{position:absolute;top:10px;left:10px;background:var(--accent);color:#1a1512;
     font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
     padding:4px 10px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  .gal-main-del{position:absolute;top:10px;right:10px;width:30px;height:30px;border:none;border-radius:8px;
+    background:rgba(20,14,11,.85);color:#e8927c;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .gal-main-del:hover{background:#3a1f18;color:#fff}
   .gallery-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:12px}
   .gthumb{position:relative;aspect-ratio:1/1;border-radius:8px;border:1px solid var(--line);
     background:#0e0b09 center/cover no-repeat;cursor:pointer;overflow:hidden;transition:.15s;outline:0}
@@ -149,6 +152,10 @@
   .gthumb.is-main{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
   .gthumb .star{position:absolute;bottom:3px;left:3px;font-size:12px;color:var(--accent);text-shadow:0 1px 3px #000;opacity:0;transition:.15s}
   .gthumb.is-main .star{opacity:1}
+  .gthumb .setmain{position:absolute;bottom:0;left:0;right:0;background:rgba(20,14,11,.85);color:#e8d9c6;
+    font-family:'Oswald',sans-serif;font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;text-align:center;
+    padding:3px 2px;opacity:0;transition:.15s;pointer-events:none}
+  .gthumb:hover .setmain{opacity:1}
   .gthumb .del{position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:6px;
     background:rgba(20,14,11,.82);color:#e8927c;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:.15s}
   .gthumb:hover .del{opacity:1}
@@ -315,6 +322,22 @@
                 <input type="number" id="f-price" min="0" step="1" placeholder="590">
               </div>
             </div>
+            <div class="row">
+              <div class="field">
+                <label for="f-stock">Ilość sztuk</label>
+                <input type="number" id="f-stock" min="0" step="1" placeholder="1">
+                <div class="hint">Ile sztuk masz na stanie. 0 = chwilowo niedostępny.</div>
+              </div>
+              <div class="field">
+                <label>Wymiary (cm)</label>
+                <div class="dims-row">
+                  <input type="number" id="f-dimh" min="0" step="0.1" placeholder="Wys." title="Wysokość (cm)">
+                  <input type="number" id="f-dimw" min="0" step="0.1" placeholder="Szer." title="Szerokość (cm)">
+                  <input type="number" id="f-dimd" min="0" step="0.1" placeholder="Głęb." title="Głębokość (cm)">
+                </div>
+                <div class="hint">Wysokość × Szerokość × Głębokość. Zostaw puste, jeśli nie dotyczy.</div>
+              </div>
+            </div>
             <div class="field">
               <label for="f-desc">Opis główny</label>
               <textarea id="f-desc" placeholder="Krótki opis (1–2 zdania)…"></textarea>
@@ -323,7 +346,8 @@
             <div class="field">
               <label for="f-descfull">Opis produktu</label>
               <textarea id="f-descfull" placeholder="Pełny opis: materiał, wymiary, wykończenie, pielęgnacja…" style="min-height:150px"></textarea>
-              <div class="hint">Pełny, szczegółowy opis na stronie produktu.</div>
+              <div class="hint">Pełny, szczegółowy opis na stronie produktu. Opisy są
+                <b>automatycznie tłumaczone</b> na angielski i niemiecki przy zapisie.</div>
             </div>
             <div class="row">
               <div class="field">
@@ -350,13 +374,16 @@
           <div>
             <p class="form-sec-label">Zdjęcia produktu</p>
             <div class="gallery-editor">
+              <div class="gal-sublabel" style="margin-top:0">Zdjęcie główne</div>
               <div class="gallery-main" id="galMain">
-                <span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>
+                <span class="ph">Brak zdjęcia głównego — dodaj poniżej</span>
               </div>
+              <div class="gal-sublabel">Galeria (dodatkowe zdjęcia)</div>
               <div class="gallery-thumbs" id="galThumbs"></div>
               <input type="file" id="f-files" accept="image/*" multiple hidden>
-              <div class="gallery-hint" id="galHint">Pierwsze zdjęcie jest <b>główne</b>. Kliknij miniaturkę, aby
-                ustawić ją jako główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone i zapisane w bazie.</div>
+              <div class="gallery-hint" id="galHint">Kliknij <b>+</b>, aby dodać zdjęcia (możesz wgrać kilka naraz).
+                Pierwsze zdjęcie jest <b>główne</b> — aby zmienić główne, kliknij inne zdjęcie w galerii.
+                Pliki (JPG/PNG) zostaną pomniejszone i zapisane w bazie.</div>
               <details class="img-url-alt">
                 <summary>…albo dodaj zdjęcie z adresu URL</summary>
                 <div class="url-add-row">
