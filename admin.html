@@ -136,10 +136,12 @@
   .lbl-note{text-transform:none;letter-spacing:0;color:var(--muted);font-size:11px}
   .lang-fields{display:flex;flex-direction:column;gap:8px}
   .lf{display:flex;gap:8px;align-items:stretch}
-  .lf-tag{flex:0 0 36px;display:flex;align-items:flex-start;justify-content:center;padding-top:11px;
+  .lf-tag{flex:0 0 36px;display:flex;align-items:center;justify-content:center;
     font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.06em;color:var(--accent);
     background:var(--bg);border:1px solid var(--line);border-radius:8px}
-  .lf textarea{flex:1;min-height:58px}
+  .lf textarea,.lf input{flex:1}
+  .lf textarea{min-height:58px}
+  .lf:has(textarea) .lf-tag{align-items:flex-start;padding-top:11px}
   /* ---------- galeria zdjęć w formularzu ---------- */
   .gallery-editor{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
   .gallery-main{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;border:1px solid var(--line);
@@ -313,8 +315,13 @@
           <div>
             <p class="form-sec-label">Dane produktu</p>
             <div class="field">
-              <label for="f-name">Nazwa *</label>
-              <input type="text" id="f-name" required placeholder="np. Półka z litego dębu">
+              <label>Nazwa produktu <span class="lbl-note">(PL wymagana)</span></label>
+              <div class="lang-fields">
+                <div class="lf"><span class="lf-tag">PL</span><input type="text" id="f-name" required placeholder="np. Półka z litego dębu"></div>
+                <div class="lf"><span class="lf-tag">EN</span><input type="text" id="f-name-en" placeholder="e.g. Solid oak shelf"></div>
+                <div class="lf"><span class="lf-tag">DE</span><input type="text" id="f-name-de" placeholder="z.B. Regal aus Eiche"></div>
+              </div>
+              <div class="hint">Puste pole EN/DE → w tym języku pokaże się nazwa polska.</div>
             </div>
             <div class="row">
               <div class="field">

@@ -56,7 +56,8 @@ const el = {
 };
 
 const f = {
-  name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
+  name: $('f-name'), nameEn: $('f-name-en'), nameDe: $('f-name-de'),
+  cat: $('f-cat'), price: $('f-price'),
   desc: $('f-desc'), descEn: $('f-desc-en'), descDe: $('f-desc-de'),
   descFull: $('f-descfull'), descFullEn: $('f-descfull-en'), descFullDe: $('f-descfull-de'),
   art: $('f-art'), id: $('f-id'),
@@ -400,6 +401,8 @@ el.addProductBtn.addEventListener('click', () => {
 /* ---------- formularz: dodawanie / edycja ---------- */
 function fillForm(p) {
   f.name.value = p.name || '';
+  f.nameEn.value = p.nameEn || '';
+  f.nameDe.value = p.nameDe || '';
   f.cat.value = p.cat || 'wood';
   f.price.value = p.price != null ? p.price : '';
   f.stock.value = p.stock != null ? p.stock : '';
@@ -477,6 +480,8 @@ el.productForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
     name: f.name.value.trim(),
+    nameEn: f.nameEn.value.trim(),
+    nameDe: f.nameDe.value.trim(),
     cat: f.cat.value,
     price: Number(f.price.value) || 0,
     stock: f.stock.value === '' ? 1 : (Number(f.stock.value) || 0),

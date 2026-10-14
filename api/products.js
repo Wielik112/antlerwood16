@@ -30,6 +30,8 @@ function slugify(s) {
 function validate(body, { requireId } = {}) {
   const name = String(body.name || '').trim();
   if (!name) return { error: 'Pole „nazwa" jest wymagane.' };
+  const nameEn = String(body.nameEn || '').trim();
+  const nameDe = String(body.nameDe || '').trim();
 
   const cat = CATS.includes(body.cat) ? body.cat : 'wood';
   const art = ARTS.includes(body.art) ? body.art : (cat === 'wood' ? 'w1' : 'a1');
@@ -60,7 +62,7 @@ function validate(body, { requireId } = {}) {
   if (!id && requireId) id = slugify(name);
   if (requireId && !id) return { error: 'Nie udało się utworzyć identyfikatora (id) z nazwy.' };
 
-  return { data: { id, name, cat, tag, price, descr, descFull, art, img, stock, dimH, dimW, dimD,
+  return { data: { id, name, nameEn, nameDe, cat, tag, price, descr, descFull, art, img, stock, dimH, dimW, dimD,
     descEn, descDe, descFullEn, descFullDe } };
 }
 
@@ -111,6 +113,8 @@ module.exports = wrap(async function handler(req, res) {
       const { rows } = await sql`
         UPDATE products SET
           name = ${data.name},
+          name_en = ${data.nameEn || data.name},
+          name_de = ${data.nameDe || data.name},
           cat = ${data.cat},
           tag = ${data.tag},
           price = ${data.price},
@@ -179,9 +183,10 @@ module.exports = wrap(async function handler(req, res) {
     // Produkt tworzymy z pustym img — zdjęcie(a) trafiają do galerii (product_photos),
     // a products.img jest z niej wyliczane (pierwsze zdjęcie = główne).
     const { rows } = await sql`
-      INSERT INTO products (id, name, cat, tag, price, descr, desc_full, art, img, sort_order,
+      INSERT INTO products (id, name, name_en, name_de, cat, tag, price, descr, desc_full, art, img, sort_order,
         descr_en, descr_de, desc_full_en, desc_full_de, stock, dim_h, dim_w, dim_d)
-      VALUES (${data.id}, ${data.name}, ${data.cat}, ${data.tag}, ${data.price},
+      VALUES (${data.id}, ${data.name}, ${data.nameEn || data.name}, ${data.nameDe || data.name},
+              ${data.cat}, ${data.tag}, ${data.price},
               ${data.descr}, ${data.descFull}, ${data.art}, '', ${sortOrder},
               ${tr.descEn}, ${tr.descDe}, ${tr.descFullEn}, ${tr.descFullDe},
               ${data.stock}, ${data.dimH}, ${data.dimW}, ${data.dimD})
