@@ -1,5 +1,5 @@
 /* Panel admina Antlerwood — logika (czysty JS, bez frameworków).
-   Rozmawia z backendem (Vercel Functions):
+   Backend (Vercel Functions), adresy zachowane przez rewrites w vercel.json:
      GET  /api/session          – czy zalogowany
      POST /api/login {password} – logowanie
      POST /api/logout           – wylogowanie
@@ -7,6 +7,8 @@
      POST /api/products         – dodanie
      PUT  /api/products/:id      – edycja
      DELETE /api/products/:id    – usunięcie
+     POST /api/photos … PUT/DELETE – galeria zdjęć
+     GET  /api/orders           – zamówienia (Stripe)
      POST /api/seed             – import startowych produktów
    Ciasteczko sesji jest HttpOnly i wysyłane automatycznie (same-origin). */
 
@@ -19,20 +21,38 @@ const el = {
   panel: $('panel'),
   topActions: $('topActions'),
   logoutBtn: $('logoutBtn'),
+  // nawigacja / widoki
+  navProducts: $('navProducts'),
+  navOrders: $('navOrders'),
+  // produkty
   productForm: $('productForm'),
   editingId: $('editingId'),
   formTitle: $('formTitle'),
   cancelEdit: $('cancelEdit'),
   saveBtn: $('saveBtn'),
   plist: $('plist'),
-  count: $('count'),
+  tableWrap: $('tableWrap'),
+  prodEmpty: $('prodEmpty'),
+  prodSearch: $('prodSearch'),
+  addProductBtn: $('addProductBtn'),
   reloadBtn: $('reloadBtn'),
   seedBox: $('seedBox'),
   seedBtn: $('seedBtn'),
-  msg: $('msg'),
+  // modal
+  productModal: $('productModal'),
+  modalClose: $('modalClose'),
+  // zamówienia
   ordersBox: $('ordersBox'),
-  ordersCount: $('ordersCount'),
+  orderSearch: $('orderSearch'),
   ordersReload: $('ordersReload'),
+  dashOrders: $('dashOrders'),
+  dashReload: $('dashReload'),
+  // statystyki
+  statProducts: $('statProducts'),
+  statOrders: $('statOrders'),
+  statRevenue: $('statRevenue'),
+  statAvg: $('statAvg'),
+  msg: $('msg'),
 };
 
 const f = {
@@ -51,15 +71,11 @@ const gal = {
 const MAX_PHOTOS = 8;
 
 let PRODUCTS = [];
+let ORDERS = [];
 
 // ---------- Stan galerii w formularzu ----------
-// gallery: uporządkowana lista zdjęć. Pierwsze = główne. Każdy element:
-//   { key, id, url, dataUrl }
-//     id      – identyfikator zdjęcia na serwerze (null dla nowego, niezapisanego)
-//     url     – adres do podglądu (serwerowy lub data URL / link)
-//     dataUrl – dane wgranego pliku do wysłania (tylko nowe wgrane pliki)
 let gallery = [];
-let originalIds = []; // id zdjęć wczytanych z serwera (do wykrycia usunięć przy zapisie)
+let originalIds = [];
 let galKeySeq = 0;
 const nextKey = () => `g${++galKeySeq}`;
 
@@ -76,12 +92,9 @@ async function api(path, opts = {}) {
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     ...opts,
   });
-  // Odczytaj treść jako tekst, a potem spróbuj sparsować JSON — dzięki temu
-  // nawet gdy serwer zwróci nie-JSON (np. surowy błąd 500), pokażemy sensowny komunikat.
   const raw = await res.text();
   let data = null;
   try { data = raw ? JSON.parse(raw) : null; } catch (e) { /* nie-JSON */ }
-
   if (!res.ok) {
     let msg;
     if (data && typeof data.error === 'string') msg = data.error;
@@ -99,10 +112,34 @@ function escapeHtml(s) {
   ));
 }
 function fmtPrice(v) { return Number(v || 0).toLocaleString('pl-PL') + ' zł'; }
+function fmtGrosze(v, cur) {
+  const amount = Number(v || 0) / 100;
+  const c = String(cur || 'pln').toUpperCase();
+  if (c === 'PLN') return amount.toLocaleString('pl-PL', { maximumFractionDigits: 2 }) + ' zł';
+  return amount.toLocaleString('pl-PL', { maximumFractionDigits: 2 }) + ' ' + c;
+}
+function fmtDate(s) {
+  try { return new Date(s).toLocaleString('pl-PL'); } catch (e) { return String(s || ''); }
+}
+
+/* ---------- przełączanie widoków ---------- */
+function switchView(name) {
+  document.querySelectorAll('.view').forEach((v) => {
+    v.classList.toggle('hidden', v.id !== 'view-' + name);
+  });
+  document.querySelectorAll('.nav-item').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-view') === name);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('.nav-item').forEach((b) => {
+  b.addEventListener('click', () => switchView(b.getAttribute('data-view')));
+});
+document.querySelectorAll('[data-goto]').forEach((b) => {
+  b.addEventListener('click', () => switchView(b.getAttribute('data-goto')));
+});
 
 /* ---------- zdjęcie: kompresja w przeglądarce + podgląd ---------- */
-// Wczytaj plik, pomniejsz do maxDim i wyeksportuj jako JPEG data URL.
-// Jeśli wynik dalej za duży, obniż jakość/rozmiar.
 function compressImage(file, maxDim = 1400, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -118,11 +155,10 @@ function compressImage(file, maxDim = 1400, quality = 0.82) {
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; // tło pod ewentualną przezroczystość (PNG → JPEG)
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(image, 0, 0, width, height);
       let out = canvas.toDataURL('image/jpeg', quality);
-      // twardy limit ~3.5 MB — jak trzeba, spróbuj mocniej skompresować
       if (out.length > 3.5 * 1024 * 1024) {
         const c2 = document.createElement('canvas');
         const s2 = Math.min(1000 / width, 1000 / height, 1);
@@ -143,7 +179,6 @@ function compressImage(file, maxDim = 1400, quality = 0.82) {
 function cssUrl(src) { return `url('${String(src).replace(/'/g, "\\'")}')`; }
 
 function renderGallery() {
-  // duże zdjęcie główne = pierwszy element
   const main = gallery[0];
   if (main) {
     gal.main.style.backgroundImage = cssUrl(main.url);
@@ -153,7 +188,6 @@ function renderGallery() {
     gal.main.innerHTML = '<span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>';
   }
 
-  // miniaturki
   const thumbs = gallery.map((item) => `
     <div class="gthumb${item === main ? ' is-main' : ''}" data-key="${item.key}"
          title="${item === main ? 'Zdjęcie główne' : 'Kliknij, aby ustawić jako główne'}"
@@ -168,11 +202,10 @@ function renderGallery() {
     : '';
   gal.thumbs.innerHTML = thumbs + addTile;
 
-  // zdarzenia miniaturek
   gal.thumbs.querySelectorAll('.gthumb:not(.add)').forEach((node) => {
     const key = node.getAttribute('data-key');
     node.addEventListener('click', (e) => {
-      if (e.target.closest('.del')) return; // klik w „×" obsłużony niżej
+      if (e.target.closest('.del')) return;
       setMain(key);
     });
     node.addEventListener('keydown', (e) => {
@@ -186,7 +219,6 @@ function renderGallery() {
   if (addTileEl) addTileEl.addEventListener('click', () => gal.files.click());
 }
 
-// przenieś wybrane zdjęcie na początek (= główne)
 function setMain(key) {
   const idx = gallery.findIndex((x) => x.key === key);
   if (idx <= 0) return;
@@ -194,12 +226,10 @@ function setMain(key) {
   gallery.unshift(item);
   renderGallery();
 }
-
 function removePhoto(key) {
   gallery = gallery.filter((x) => x.key !== key);
   renderGallery();
 }
-
 function addGalleryItem({ id = null, url, dataUrl = null }) {
   if (gallery.length >= MAX_PHOTOS) {
     toast(`Można dodać maksymalnie ${MAX_PHOTOS} zdjęć.`, 'err');
@@ -212,9 +242,8 @@ function addGalleryItem({ id = null, url, dataUrl = null }) {
 /* ---------- galeria: dodawanie plików / URL ---------- */
 gal.files.addEventListener('change', async () => {
   const files = Array.from(gal.files.files || []);
-  gal.files.value = ''; // pozwól wybrać te same pliki ponownie
+  gal.files.value = '';
   if (!files.length) return;
-
   gal.hint.textContent = 'Przetwarzam zdjęcia…';
   gal.hint.classList.add('uploading');
   let added = 0;
@@ -265,8 +294,9 @@ async function showPanel() {
   el.loginScreen.classList.add('hidden');
   el.panel.classList.remove('hidden');
   el.topActions.classList.remove('hidden');
+  switchView('dashboard');
   await loadProducts();
-  loadOrders();
+  await loadOrders();
 }
 
 el.loginForm.addEventListener('submit', async (e) => {
@@ -296,36 +326,71 @@ async function loadProducts() {
     PRODUCTS = [];
   }
   renderList();
+  renderStats();
 }
 
 function renderList() {
-  el.count.textContent = PRODUCTS.length;
+  if (el.navProducts) el.navProducts.textContent = String(PRODUCTS.length);
   el.seedBox.classList.toggle('hidden', PRODUCTS.length > 0);
 
-  el.plist.innerHTML = PRODUCTS.map((p) => {
+  const q = (el.prodSearch.value || '').trim().toLowerCase();
+  const list = q
+    ? PRODUCTS.filter((p) => (`${p.name || ''} ${p.id || ''} ${p.desc || ''}`).toLowerCase().includes(q))
+    : PRODUCTS;
+
+  el.tableWrap.classList.toggle('hidden', list.length === 0);
+  el.prodEmpty.classList.toggle('hidden', !(PRODUCTS.length > 0 && list.length === 0));
+
+  el.plist.innerHTML = list.map((p) => {
     const bg = p.img ? `background-image:url('${escapeHtml(p.img)}')` : '';
     const catLabel = p.cat === 'wood' ? 'Lite drewno' : 'Poroże';
+    const catClass = p.cat === 'wood' ? 'wood' : 'antler';
     const nPhotos = Array.isArray(p.images) ? p.images.length : (p.img ? 1 : 0);
-    const photoBadge = nPhotos > 1 ? ` · <span class="badge">${nPhotos} zdj.</span>` : '';
-    return `<div class="pitem" data-id="${escapeHtml(p.id)}">
-      <div class="pthumb" style="${bg}"></div>
-      <div class="pmeta">
-        <b>${escapeHtml(p.name)}</b>
-        <span class="sub">${fmtPrice(p.price)} · <span class="badge">${catLabel}</span>${photoBadge} · <code>${escapeHtml(p.id)}</code></span>
-      </div>
-      <div class="pactions">
+    return `<tr data-id="${escapeHtml(p.id)}">
+      <td><div class="pthumb" style="${bg}"></div></td>
+      <td><span class="pname">${escapeHtml(p.name)}</span><code class="pid">${escapeHtml(p.id)}</code></td>
+      <td class="hide-sm"><span class="badge ${catClass}">${catLabel}</span></td>
+      <td class="price-cell">${fmtPrice(p.price)}</td>
+      <td class="hide-sm">${nPhotos} zdj.</td>
+      <td class="col-actions">
         <button class="btn secondary small" data-act="edit">Edytuj</button>
         <button class="btn danger small" data-act="del">Usuń</button>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   }).join('');
 
-  el.plist.querySelectorAll('.pitem').forEach((row) => {
+  el.plist.querySelectorAll('tr').forEach((row) => {
     const id = row.getAttribute('data-id');
     row.querySelector('[data-act="edit"]').addEventListener('click', () => startEdit(id));
     row.querySelector('[data-act="del"]').addEventListener('click', () => remove(id));
   });
 }
+el.prodSearch.addEventListener('input', renderList);
+
+/* ---------- modal: otwieranie / zamykanie ---------- */
+function openModal() {
+  el.productModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => f.name.focus(), 50);
+}
+function closeModal() {
+  el.productModal.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+el.modalClose.addEventListener('click', closeModal);
+el.cancelEdit.addEventListener('click', closeModal);
+el.productModal.addEventListener('mousedown', (e) => {
+  if (e.target === el.productModal) closeModal(); // klik w tło zamyka
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !el.productModal.classList.contains('hidden')) closeModal();
+});
+el.addProductBtn.addEventListener('click', () => {
+  clearForm();
+  el.formTitle.textContent = 'Dodaj produkt';
+  el.saveBtn.textContent = 'Zapisz produkt';
+  openModal();
+});
 
 /* ---------- formularz: dodawanie / edycja ---------- */
 function fillForm(p) {
@@ -337,7 +402,6 @@ function fillForm(p) {
   f.art.value = p.art || 'w1';
   f.id.value = p.id || '';
 
-  // galeria: wczytaj zdjęcia produktu (pierwsze = główne)
   gallery = [];
   originalIds = [];
   const photos = Array.isArray(p.photos) ? p.photos : [];
@@ -347,7 +411,6 @@ function fillForm(p) {
       if (ph.id) originalIds.push(ph.id);
     }
   } else if (p.img) {
-    // produkt bez galerii, ale z pojedynczym zdjęciem (np. startowe z linkiem)
     gallery.push({ key: nextKey(), id: null, url: p.img, dataUrl: null });
   }
   gal.urlInput.value = '';
@@ -357,11 +420,7 @@ function clearForm() {
   el.editingId.value = '';
   el.productForm.reset();
   f.art.value = 'w1';
-  el.formTitle.textContent = 'Dodaj produkt';
-  el.saveBtn.textContent = 'Zapisz produkt';
-  el.cancelEdit.classList.add('hidden');
   f.id.removeAttribute('readonly');
-  // reset galerii
   gallery = [];
   originalIds = [];
   gal.urlInput.value = '';
@@ -372,18 +431,16 @@ function clearForm() {
 function startEdit(id) {
   const p = PRODUCTS.find((x) => x.id === id);
   if (!p) return;
+  clearForm();
   el.editingId.value = id;
   fillForm(p);
   f.id.setAttribute('readonly', 'readonly'); // id nie zmieniamy przy edycji
   el.formTitle.textContent = 'Edytuj produkt';
   el.saveBtn.textContent = 'Zapisz zmiany';
-  el.cancelEdit.classList.remove('hidden');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  openModal();
 }
-el.cancelEdit.addEventListener('click', clearForm);
 
-// Uzgodnij galerię na serwerze z bieżącym stanem edytora:
-// 1) usuń skasowane zdjęcia, 2) dodaj nowe (w kolejności), 3) ustaw finalną kolejność.
+// Uzgodnij galerię na serwerze z bieżącym stanem edytora.
 async function syncGallery(productId) {
   const currentIds = gallery.filter((x) => x.id).map((x) => x.id);
   const toDelete = originalIds.filter((id) => !currentIds.includes(id));
@@ -391,11 +448,9 @@ async function syncGallery(productId) {
     await api('/api/photos/' + encodeURIComponent(id), { method: 'DELETE' });
   }
   for (const item of gallery) {
-    if (item.id) continue; // już zapisane
+    if (item.id) continue;
     const img = item.dataUrl || item.url;
-    const r = await api('/api/photos', {
-      method: 'POST', body: JSON.stringify({ productId, img }),
-    });
+    const r = await api('/api/photos', { method: 'POST', body: JSON.stringify({ productId, img }) });
     item.id = r.id;
   }
   const order = gallery.map((x) => x.id).filter(Boolean);
@@ -432,6 +487,7 @@ el.productForm.addEventListener('submit', async (e) => {
     }
     await syncGallery(productId);
     toast(editingId ? 'Zapisano zmiany.' : 'Dodano produkt.', 'ok');
+    closeModal();
     clearForm();
     await loadProducts();
   } catch (err) {
@@ -448,7 +504,7 @@ async function remove(id) {
   try {
     await api('/api/products/' + encodeURIComponent(id), { method: 'DELETE' });
     toast('Usunięto produkt.', 'ok');
-    if (el.editingId.value === id) clearForm();
+    if (el.editingId.value === id) { closeModal(); clearForm(); }
     await loadProducts();
   } catch (err) {
     toast(err.message, 'err');
@@ -472,56 +528,90 @@ el.seedBtn.addEventListener('click', async () => {
 el.reloadBtn.addEventListener('click', loadProducts);
 
 /* ---------- zamówienia (Stripe) ---------- */
-function fmtGrosze(v, cur) {
-  const amount = Number(v || 0) / 100;
-  const c = String(cur || 'pln').toUpperCase();
-  if (c === 'PLN') return amount.toLocaleString('pl-PL') + ' zł';
-  return amount.toLocaleString('pl-PL') + ' ' + c;
-}
-function fmtDate(s) {
-  try { return new Date(s).toLocaleString('pl-PL'); } catch (e) { return String(s || ''); }
-}
-
 async function loadOrders() {
-  if (!el.ordersBox) return;
   try {
     const orders = await api('/api/orders');
-    renderOrders(Array.isArray(orders) ? orders : []);
+    ORDERS = Array.isArray(orders) ? orders : [];
   } catch (err) {
-    if (el.ordersCount) el.ordersCount.textContent = '0';
+    ORDERS = [];
     el.ordersBox.innerHTML = `<p class="hint">Nie udało się pobrać zamówień: ${escapeHtml(err.message)}</p>`;
+    if (el.dashOrders) el.dashOrders.innerHTML = `<p class="hint">Nie udało się pobrać zamówień.</p>`;
   }
+  renderOrders();
+  renderDashOrders();
+  renderStats();
 }
 
-function renderOrders(orders) {
-  if (el.ordersCount) el.ordersCount.textContent = String(orders.length);
-  if (!orders.length) {
-    el.ordersBox.innerHTML = '<p class="hint">Brak zamówień. Pojawią się tu po pierwszej udanej płatności.</p>';
+function orderRowHtml(o) {
+  const items = (Array.isArray(o.items) ? o.items : [])
+    .map((it) => `${escapeHtml(it.name)} × ${it.qty}`).join(', ');
+  const ship = o.shipping && o.shipping.address ? o.shipping.address : null;
+  const shipLine = ship
+    ? [ship.line1, ship.line2, `${ship.postal_code || ''} ${ship.city || ''}`.trim(), ship.country]
+      .filter(Boolean).map(escapeHtml).join(', ')
+    : '';
+  const st = String(o.status || '').toLowerCase();
+  const stClass = st === 'paid' ? 'paid' : (st === 'pending' ? 'pending' : 'other');
+  const stLabel = st === 'paid' ? 'Opłacone' : (st === 'pending' ? 'W trakcie' : escapeHtml(o.status || '—'));
+  return `<div class="order-row">
+    <div class="order-top">
+      <span class="order-amount">${fmtGrosze(o.amount_total, o.currency)}</span>
+      <span class="status ${stClass}">${stLabel}</span>
+      <span class="hint" style="margin-left:auto">${fmtDate(o.created_at)}</span>
+    </div>
+    <div class="hint" style="margin-top:6px">${escapeHtml(o.customer_name || '')}${o.email ? ' · ' + escapeHtml(o.email) : ''}</div>
+    ${items ? `<div class="order-items">${escapeHtml(items)}</div>` : ''}
+    ${shipLine ? `<div class="hint" style="margin-top:6px">Wysyłka: ${shipLine}</div>` : ''}
+    <div class="hint" style="margin-top:6px;opacity:.6;font-size:.82em"><code>${escapeHtml(o.id)}</code></div>
+  </div>`;
+}
+
+function renderOrders() {
+  if (el.navOrders) el.navOrders.textContent = String(ORDERS.length);
+  const q = (el.orderSearch.value || '').trim().toLowerCase();
+  const list = q
+    ? ORDERS.filter((o) => {
+        const items = (Array.isArray(o.items) ? o.items : []).map((it) => it.name).join(' ');
+        return (`${o.customer_name || ''} ${o.email || ''} ${o.id || ''} ${o.status || ''} ${items}`)
+          .toLowerCase().includes(q);
+      })
+    : ORDERS;
+  if (!ORDERS.length) {
+    el.ordersBox.innerHTML = '<div class="empty">Brak zamówień. Pojawią się tu po pierwszej udanej płatności.</div>';
     return;
   }
-  el.ordersBox.innerHTML = orders.map((o) => {
-    const items = (Array.isArray(o.items) ? o.items : [])
-      .map((it) => `${escapeHtml(it.name)} × ${it.qty}`).join(', ');
-    const ship = o.shipping && o.shipping.address ? o.shipping.address : null;
-    const shipLine = ship
-      ? [ship.line1, ship.line2, `${ship.postal_code || ''} ${ship.city || ''}`.trim(), ship.country]
-        .filter(Boolean).map(escapeHtml).join(', ')
-      : '';
-    return `<div class="order-row" style="border:1px solid var(--line,#333);border-radius:12px;padding:14px 16px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
-        <strong>${fmtGrosze(o.amount_total, o.currency)}</strong>
-        <span class="hint">${fmtDate(o.created_at)}</span>
-      </div>
-      <div class="hint" style="margin-top:6px">${escapeHtml(o.customer_name || '')}${o.email ? ' · ' + escapeHtml(o.email) : ''}</div>
-      <div style="margin-top:6px">${escapeHtml(items)}</div>
-      ${shipLine ? `<div class="hint" style="margin-top:6px">Wysyłka: ${shipLine}</div>` : ''}
-      <div class="hint" style="margin-top:6px;opacity:.6;font-size:.82em">${escapeHtml(o.status)} · ${escapeHtml(o.id)}</div>
-    </div>`;
-  }).join('');
+  if (!list.length) {
+    el.ordersBox.innerHTML = '<div class="empty">Brak zamówień pasujących do wyszukiwania.</div>';
+    return;
+  }
+  el.ordersBox.innerHTML = list.map(orderRowHtml).join('');
+}
+el.orderSearch.addEventListener('input', renderOrders);
+
+function renderDashOrders() {
+  if (!el.dashOrders) return;
+  if (!ORDERS.length) {
+    el.dashOrders.innerHTML = '<p class="hint">Brak zamówień.</p>';
+    return;
+  }
+  el.dashOrders.innerHTML = ORDERS.slice(0, 5).map(orderRowHtml).join('');
+}
+
+/* ---------- statystyki (pulpit) ---------- */
+function renderStats() {
+  if (el.statProducts) el.statProducts.textContent = String(PRODUCTS.length);
+  if (el.statOrders) el.statOrders.textContent = String(ORDERS.length);
+  const paid = ORDERS.filter((o) => String(o.status || '').toLowerCase() === 'paid');
+  const revenue = paid.reduce((sum, o) => sum + (Number(o.amount_total) || 0), 0);
+  const base = paid.length ? paid : ORDERS;
+  const baseRevenue = base.reduce((sum, o) => sum + (Number(o.amount_total) || 0), 0);
+  if (el.statRevenue) el.statRevenue.textContent = fmtGrosze(revenue, 'pln');
+  if (el.statAvg) el.statAvg.textContent = base.length ? fmtGrosze(Math.round(baseRevenue / base.length), 'pln') : '—';
 }
 
 if (el.ordersReload) el.ordersReload.addEventListener('click', loadOrders);
+if (el.dashReload) el.dashReload.addEventListener('click', async () => { await loadProducts(); await loadOrders(); });
 
 /* start */
-renderGallery();   // pokaż pusty edytor galerii (kafel „+")
+renderGallery();
 checkSession();

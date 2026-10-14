@@ -11,59 +11,128 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Zilla+Slab:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#1a1512; --panel:#241d18; --panel2:#2c241e; --line:#3a2f26;
+    --bg:#17120f; --panel:#241d18; --panel2:#2c241e; --panel3:#332a22; --line:#3a2f26;
     --text:#f0e7dc; --muted:#b7a795; --accent:#c98a3c; --accent2:#8a5a2b;
-    --danger:#c0492f; --ok:#4c8a3c; --radius:12px;
+    --danger:#c0492f; --ok:#4c8a3c; --radius:14px;
   }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Zilla Slab',Georgia,serif;line-height:1.5}
-  h1,h2,h3,label,button,th,.brandline{font-family:'Oswald',sans-serif}
+  h1,h2,h3,h4,label,button,th,.brandline,.nav-item,.stat-value,.stat-label{font-family:'Oswald',sans-serif}
   a{color:var(--accent)}
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-  .brandline{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
-  .brandline img{height:34px;width:auto;border-radius:6px}
-  .wrap{max-width:1040px;margin:0 auto;padding:26px 22px 80px}
-  .btn{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:13px;border:none;border-radius:9px;padding:11px 18px;cursor:pointer;transition:.15s;background:var(--accent);color:#1a1512}
+  /* ---------- topbar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+  .brandline{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:15px}
+  .brandline img{height:32px;width:auto;border-radius:6px}
+  .top-actions{display:flex;gap:8px}
+  /* ---------- buttons ---------- */
+  .btn{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:13px;border:none;border-radius:9px;padding:11px 18px;cursor:pointer;transition:.15s;background:var(--accent);color:#1a1512;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
   .btn:hover{filter:brightness(1.08)}
   .btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.secondary:hover{background:var(--panel3)}
   .btn.danger{background:transparent;color:#e8927c;border:1px solid #6b3428}
   .btn.danger:hover{background:#3a1f18}
   .btn.small{padding:7px 12px;font-size:12px}
   .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn svg{width:16px;height:16px;flex:0 0 auto}
+  /* ---------- cards / generic ---------- */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
   .muted{color:var(--muted)}
-  /* login */
-  .login-wrap{max-width:400px;margin:9vh auto 0;text-align:center}
+  .hint{font-size:12.5px;color:var(--muted)}
+  .hidden{display:none!important}
+  code{background:var(--bg);padding:2px 6px;border-radius:5px;border:1px solid var(--line);font-size:12.5px}
+  .sec-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
+  .sec-title h2{margin:0;font-size:19px;letter-spacing:.04em}
+  .empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+  /* ---------- login ---------- */
+  .login-wrap{max-width:400px;margin:10vh auto 0;text-align:center;padding:0 18px}
   .login-wrap .card{text-align:left}
-  /* forms */
+  /* ---------- forms ---------- */
   .field{margin-bottom:14px}
   .field label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-  .field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px 12px;font-family:'Zilla Slab',serif;font-size:15px}
-  .field textarea{min-height:78px;resize:vertical}
+  .field input,.field select,.field textarea,.search{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px 12px;font-family:'Zilla Slab',serif;font-size:15px}
+  .field input:focus,.field select:focus,.field textarea:focus,.search:focus{outline:none;border-color:var(--accent)}
+  .field textarea{min-height:80px;resize:vertical}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:640px){.row{grid-template-columns:1fr}}
-  .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  /* layout */
-  .grid2{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;align-items:start}
-  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
-  .sec-title{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
-  .sec-title h2{margin:0;font-size:20px;letter-spacing:.04em}
-  /* product list */
-  .plist{display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow:auto}
-  .pitem{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
-  .pthumb{width:52px;height:52px;border-radius:8px;background:#0e0b09 center/cover no-repeat;flex:0 0 auto;border:1px solid var(--line)}
-  .pmeta{flex:1;min-width:0}
-  .pmeta b{display:block;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .pmeta .sub{font-size:12.5px;color:var(--muted)}
-  .badge{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
-  .pactions{display:flex;gap:6px;flex:0 0 auto}
-  /* toast */
-  #msg{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--accent);padding:12px 18px;border-radius:10px;transition:.25s;max-width:90vw;z-index:20}
-  #msg.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #msg.err{border-left-color:var(--danger)}
-  #msg.ok{border-left-color:var(--ok)}
-  .empty{padding:26px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
-  .hidden{display:none!important}
+  /* ---------- admin layout ---------- */
+  .admin{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 61px)}
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px}
+  .nav{display:flex;flex-direction:column;gap:4px;position:sticky;top:79px}
+  .nav-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:none;color:var(--muted);
+    font-weight:500;letter-spacing:.04em;font-size:14.5px;padding:11px 13px;border-radius:9px;cursor:pointer;transition:.15s}
+  .nav-item svg{width:18px;height:18px;flex:0 0 auto}
+  .nav-item:hover{background:var(--panel2);color:var(--text)}
+  .nav-item.active{background:var(--panel3);color:var(--text);box-shadow:inset 3px 0 0 var(--accent)}
+  .nav-item .pill{margin-left:auto;background:var(--bg);border:1px solid var(--line);color:var(--muted);
+    font-size:11.5px;min-width:22px;text-align:center;padding:1px 7px;border-radius:20px}
+  .nav-item.active .pill{border-color:var(--accent2);color:var(--text)}
+  .content{padding:26px 28px 90px;max-width:1180px;width:100%}
+  @media(max-width:860px){
+    .admin{grid-template-columns:1fr}
+    .sidebar{border-right:none;border-bottom:1px solid var(--line);padding:10px}
+    .nav{flex-direction:row;overflow-x:auto;position:static}
+    .nav-item{flex:0 0 auto}
+    .nav-item.active{box-shadow:inset 0 -3px 0 var(--accent)}
+    .content{padding:20px 16px 80px}
+  }
+  .view-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+  .view-head h1{margin:0;font-size:26px;letter-spacing:.03em}
+  .view-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .view-actions .search{width:220px}
+  @media(max-width:640px){.view-actions{width:100%}.view-actions .search{flex:1;width:auto}}
+  /* ---------- dashboard stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+  @media(max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px}
+  .stat-label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stat-value{font-size:30px;font-weight:600;margin-top:8px;line-height:1.1}
+  .stat-sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .stat.accent{border-color:var(--accent2)}
+  .stat.accent .stat-value{color:var(--accent)}
+  /* ---------- product table ---------- */
+  .table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .ptable{width:100%;border-collapse:collapse;font-size:14.5px}
+  .ptable th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;
+    padding:13px 14px;border-bottom:1px solid var(--line);font-weight:600;background:var(--panel2)}
+  .ptable td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .ptable tr:last-child td{border-bottom:none}
+  .ptable tr:hover td{background:var(--panel2)}
+  .ptable .col-actions{text-align:right;white-space:nowrap}
+  .ptable .pname{font-family:'Oswald',sans-serif;font-weight:500}
+  .ptable .pid{display:block;margin-top:2px}
+  .pthumb{width:48px;height:48px;border-radius:8px;background:#0e0b09 center/cover no-repeat;border:1px solid var(--line)}
+  .badge{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .badge.wood{border-color:#6b4a2b;color:#d8a86a}
+  .badge.antler{border-color:#5a5048;color:#cdbca6}
+  .price-cell{font-family:'Oswald',sans-serif;font-weight:600;color:var(--accent)}
+  @media(max-width:720px){.ptable .hide-sm{display:none}}
+  /* ---------- orders ---------- */
+  .order-row{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:12px}
+  .order-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+  .order-amount{font-family:'Oswald',sans-serif;font-weight:600;font-size:17px}
+  .order-items{margin-top:7px}
+  .status{display:inline-block;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:20px;border:1px solid var(--line)}
+  .status.paid{border-color:#2f6b2a;color:#7fc46a;background:#15240f}
+  .status.pending{border-color:#6b5a2a;color:#d8be6a;background:#241f0f}
+  .status.other{border-color:var(--line);color:var(--muted)}
+  /* ---------- modal (pełny ekran) ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,7,5,.72);backdrop-filter:blur(3px);z-index:50;
+    display:flex;align-items:center;justify-content:center;padding:20px}
+  @media(max-width:640px){.modal-overlay{padding:0}}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(1080px,100%);
+    height:min(94vh,920px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  @media(max-width:640px){.modal{height:100vh;border-radius:0;border:none}}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .modal-head h2{margin:0;font-size:20px;letter-spacing:.04em}
+  .modal-close{background:transparent;border:1px solid var(--line);color:var(--muted);width:38px;height:38px;border-radius:9px;
+    font-size:22px;line-height:1;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
+  .modal-close:hover{background:var(--panel3);color:var(--text)}
+  .modal-body{padding:24px;overflow:auto;flex:1}
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--line);background:var(--panel2)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+  @media(max-width:820px){.form-grid{grid-template-columns:1fr;gap:20px}}
+  .form-sec-label{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
   /* ---------- galeria zdjęć w formularzu ---------- */
   .gallery-editor{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
   .gallery-main{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;border:1px solid var(--line);
@@ -73,22 +142,18 @@
   .gallery-main-badge{position:absolute;top:10px;left:10px;background:var(--accent);color:#1a1512;
     font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
     padding:4px 10px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
-  /* siatka miniaturek — małe kwadraciki */
   .gallery-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:12px}
   .gthumb{position:relative;aspect-ratio:1/1;border-radius:8px;border:1px solid var(--line);
     background:#0e0b09 center/cover no-repeat;cursor:pointer;overflow:hidden;transition:.15s;outline:0}
   .gthumb:hover{border-color:var(--accent2);transform:translateY(-1px)}
   .gthumb.is-main{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
-  .gthumb .star{position:absolute;bottom:3px;left:3px;font-size:12px;color:var(--accent);
-    text-shadow:0 1px 3px #000;opacity:0;transition:.15s}
+  .gthumb .star{position:absolute;bottom:3px;left:3px;font-size:12px;color:var(--accent);text-shadow:0 1px 3px #000;opacity:0;transition:.15s}
   .gthumb.is-main .star{opacity:1}
   .gthumb .del{position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:6px;
-    background:rgba(20,14,11,.82);color:#e8927c;font-size:14px;line-height:1;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;opacity:0;transition:.15s}
+    background:rgba(20,14,11,.82);color:#e8927c;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:.15s}
   .gthumb:hover .del{opacity:1}
   .gthumb .del:hover{background:#3a1f18;color:#fff}
-  .gthumb.add{display:flex;align-items:center;justify-content:center;border-style:dashed;background:var(--bg);
-    color:var(--muted);font-size:26px;font-weight:300}
+  .gthumb.add{display:flex;align-items:center;justify-content:center;border-style:dashed;background:var(--bg);color:var(--muted);font-size:26px;font-weight:300}
   .gthumb.add:hover{color:var(--accent);border-color:var(--accent)}
   .gallery-hint{font-size:12px;color:var(--muted);margin-top:10px}
   .gallery-hint.uploading{color:var(--accent)}
@@ -96,14 +161,19 @@
   .img-url-alt summary{cursor:pointer;color:var(--muted);font-size:12.5px;font-family:'Oswald',sans-serif;letter-spacing:.04em}
   .url-add-row{display:flex;gap:8px;margin-top:8px}
   .url-add-row input{flex:1}
-  code{background:var(--bg);padding:2px 6px;border-radius:5px;border:1px solid var(--line);font-size:13px}
+  /* ---------- toast ---------- */
+  #msg{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
+    background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--accent);padding:12px 18px;border-radius:10px;transition:.25s;max-width:90vw;z-index:80}
+  #msg.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #msg.err{border-left-color:var(--danger)}
+  #msg.ok{border-left-color:var(--ok)}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="brandline"><img src="assets/logo-mark.png" alt="Antlerwood">Panel admina</div>
-  <div id="topActions" class="hidden">
+  <div id="topActions" class="top-actions hidden">
     <a class="btn secondary small" href="sklep.html" target="_blank">Podgląd sklepu ↗</a>
     <button class="btn secondary small" id="logoutBtn" type="button">Wyloguj</button>
   </div>
@@ -113,118 +183,197 @@
 <div class="login-wrap" id="loginScreen">
   <div class="card">
     <h2 style="margin-top:0">Logowanie</h2>
-    <p class="muted" style="margin-top:0">Podaj hasło administratora, aby zarządzać produktami.</p>
+    <p class="muted" style="margin-top:0">Podaj hasło administratora, aby zarządzać sklepem.</p>
     <form id="loginForm">
       <div class="field">
         <label for="pw">Hasło</label>
         <input type="password" id="pw" autocomplete="current-password" required>
       </div>
-      <button class="btn" type="submit" style="width:100%">Zaloguj</button>
+      <button class="btn" type="submit" style="width:100%;justify-content:center">Zaloguj</button>
     </form>
   </div>
 </div>
 
 <!-- PANEL -->
-<div class="wrap hidden" id="panel">
-  <div class="grid2">
+<div class="admin hidden" id="panel">
+  <aside class="sidebar">
+    <nav class="nav">
+      <button class="nav-item active" data-view="dashboard" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        Pulpit
+      </button>
+      <button class="nav-item" data-view="products" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+        Produkty <span class="pill" id="navProducts">0</span>
+      </button>
+      <button class="nav-item" data-view="orders" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2l1.5 3h9L18 2"/><path d="M3 6h18l-1.5 13a2 2 0 01-2 1.8H6.5a2 2 0 01-2-1.8L3 6z"/><path d="M9 11h6"/></svg>
+        Zamówienia <span class="pill" id="navOrders">0</span>
+      </button>
+    </nav>
+  </aside>
 
-    <!-- FORMULARZ -->
-    <div class="card">
-      <div class="sec-title"><h2 id="formTitle">Dodaj produkt</h2>
-        <button class="btn secondary small hidden" id="cancelEdit" type="button">Anuluj edycję</button></div>
-      <form id="productForm">
-        <input type="hidden" id="editingId">
-        <div class="field">
-          <label for="f-name">Nazwa *</label>
-          <input type="text" id="f-name" required placeholder="np. Półka z litego dębu">
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="f-cat">Kategoria</label>
-            <select id="f-cat">
-              <option value="wood">Lite drewno</option>
-              <option value="antler">Poroże</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="f-price">Cena (zł)</label>
-            <input type="number" id="f-price" min="0" step="1" placeholder="590">
-          </div>
-        </div>
-        <div class="field">
-          <label for="f-desc">Opis główny</label>
-          <textarea id="f-desc" placeholder="Krótki opis (1–2 zdania)…"></textarea>
-          <div class="hint">Krótki opis pokazywany na kaflach w sklepie i na listach produktów.</div>
-        </div>
-        <div class="field">
-          <label for="f-descfull">Opis produktu</label>
-          <textarea id="f-descfull" placeholder="Pełny opis: materiał, wymiary, wykończenie, pielęgnacja…" style="min-height:130px"></textarea>
-          <div class="hint">Pełny, szczegółowy opis widoczny na stronie produktu. To osobny tekst niż opis główny.</div>
-        </div>
-        <div class="field">
-          <label>Zdjęcia produktu</label>
-          <div class="gallery-editor">
-            <!-- duże zdjęcie główne -->
-            <div class="gallery-main" id="galMain">
-              <span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>
-            </div>
-            <!-- mini galeria: kwadratowe miniaturki + kafel „dodaj" -->
-            <div class="gallery-thumbs" id="galThumbs"></div>
-            <input type="file" id="f-files" accept="image/*" multiple hidden>
-            <div class="gallery-hint" id="galHint">Pierwsze zdjęcie jest <b>główne</b>. Kliknij miniaturkę,
-              aby ustawić ją jako główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone
-              i zapisane w bazie.</div>
-            <details class="img-url-alt">
-              <summary>…albo dodaj zdjęcie z adresu URL</summary>
-              <div class="url-add-row">
-                <input type="url" id="f-imgurl" placeholder="https://… lub assets/moje-zdjecie.jpg">
-                <button type="button" class="btn secondary small" id="addUrlBtn">Dodaj</button>
-              </div>
-            </details>
-          </div>
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="f-art">Tło zapasowe (gdy brak zdjęcia)</label>
-            <select id="f-art">
-              <option value="w1">Drewno 1</option>
-              <option value="w2">Drewno 2</option>
-              <option value="w3">Drewno 3</option>
-              <option value="a1">Poroże 1</option>
-              <option value="a2">Poroże 2</option>
-              <option value="a3">Poroże 3</option>
-              <option value="centerpc">Wyróżnione</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="f-id">Identyfikator (id)</label>
-            <input type="text" id="f-id" placeholder="tworzy się z nazwy">
-            <div class="hint">Zostaw puste — utworzy się automatycznie.</div>
-          </div>
-        </div>
-        <button class="btn" type="submit" id="saveBtn" style="width:100%">Zapisz produkt</button>
-      </form>
-    </div>
+  <main class="content">
 
-    <!-- LISTA -->
-    <div class="card">
-      <div class="sec-title"><h2>Produkty (<span id="count">0</span>)</h2>
-        <button class="btn secondary small" id="reloadBtn" type="button">Odśwież</button></div>
+    <!-- WIDOK: PULPIT -->
+    <section class="view" id="view-dashboard">
+      <div class="view-head">
+        <h1>Pulpit</h1>
+        <button class="btn secondary small" id="dashReload" type="button">Odśwież</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Produkty</div><div class="stat-value" id="statProducts">—</div><div class="stat-sub" id="statProductsSub">w sklepie</div></div>
+        <div class="stat"><div class="stat-label">Zamówienia</div><div class="stat-value" id="statOrders">—</div><div class="stat-sub" id="statOrdersSub">łącznie</div></div>
+        <div class="stat accent"><div class="stat-label">Przychód</div><div class="stat-value" id="statRevenue">—</div><div class="stat-sub">opłacone zamówienia</div></div>
+        <div class="stat"><div class="stat-label">Śr. wartość</div><div class="stat-value" id="statAvg">—</div><div class="stat-sub">na zamówienie</div></div>
+      </div>
+      <div class="card">
+        <div class="sec-title"><h2>Ostatnie zamówienia</h2>
+          <button class="btn secondary small" data-goto="orders" type="button">Wszystkie →</button></div>
+        <div id="dashOrders"><p class="hint">Ładuję…</p></div>
+      </div>
+    </section>
+
+    <!-- WIDOK: PRODUKTY -->
+    <section class="view hidden" id="view-products">
+      <div class="view-head">
+        <h1>Produkty</h1>
+        <div class="view-actions">
+          <input type="search" id="prodSearch" class="search" placeholder="Szukaj produktu…">
+          <button class="btn secondary small" id="reloadBtn" type="button">Odśwież</button>
+          <button class="btn" id="addProductBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+            Dodaj produkt
+          </button>
+        </div>
+      </div>
       <div id="seedBox" class="empty hidden">
-        <p>Baza jest pusta.</p>
+        <p>Baza produktów jest pusta.</p>
         <button class="btn small" id="seedBtn" type="button">Zaimportuj startowe 9 produktów</button>
       </div>
-      <div class="plist" id="plist"></div>
+      <div class="table-wrap" id="tableWrap">
+        <table class="ptable">
+          <thead><tr>
+            <th style="width:56px"></th>
+            <th>Nazwa</th>
+            <th class="hide-sm">Kategoria</th>
+            <th>Cena</th>
+            <th class="hide-sm">Zdjęcia</th>
+            <th class="col-actions"></th>
+          </tr></thead>
+          <tbody id="plist"></tbody>
+        </table>
+      </div>
+      <div id="prodEmpty" class="empty hidden" style="margin-top:14px">Brak produktów pasujących do wyszukiwania.</div>
+    </section>
+
+    <!-- WIDOK: ZAMÓWIENIA -->
+    <section class="view hidden" id="view-orders">
+      <div class="view-head">
+        <h1>Zamówienia</h1>
+        <div class="view-actions">
+          <input type="search" id="orderSearch" class="search" placeholder="Szukaj: nazwa, e-mail, id…">
+          <button class="btn secondary small" id="ordersReload" type="button">Odśwież</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:-8px 0 16px">Opłacone zamówienia ze Stripe. Pojawiają się automatycznie po udanej płatności.</p>
+      <div id="ordersBox"><p class="hint">Ładuję…</p></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL PRODUKTU (pełny ekran) -->
+<div class="modal-overlay hidden" id="productModal" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="formTitle">Dodaj produkt</h2>
+      <button class="modal-close" id="modalClose" type="button" aria-label="Zamknij">×</button>
     </div>
+    <div class="modal-body">
+      <form id="productForm">
+        <input type="hidden" id="editingId">
+        <div class="form-grid">
 
-  </div>
+          <!-- LEWA: dane produktu -->
+          <div>
+            <p class="form-sec-label">Dane produktu</p>
+            <div class="field">
+              <label for="f-name">Nazwa *</label>
+              <input type="text" id="f-name" required placeholder="np. Półka z litego dębu">
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="f-cat">Kategoria</label>
+                <select id="f-cat">
+                  <option value="wood">Lite drewno</option>
+                  <option value="antler">Poroże</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-price">Cena (zł)</label>
+                <input type="number" id="f-price" min="0" step="1" placeholder="590">
+              </div>
+            </div>
+            <div class="field">
+              <label for="f-desc">Opis główny</label>
+              <textarea id="f-desc" placeholder="Krótki opis (1–2 zdania)…"></textarea>
+              <div class="hint">Pokazywany na kaflach w sklepie i na listach produktów.</div>
+            </div>
+            <div class="field">
+              <label for="f-descfull">Opis produktu</label>
+              <textarea id="f-descfull" placeholder="Pełny opis: materiał, wymiary, wykończenie, pielęgnacja…" style="min-height:150px"></textarea>
+              <div class="hint">Pełny, szczegółowy opis na stronie produktu.</div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="f-art">Tło zapasowe (gdy brak zdjęcia)</label>
+                <select id="f-art">
+                  <option value="w1">Drewno 1</option>
+                  <option value="w2">Drewno 2</option>
+                  <option value="w3">Drewno 3</option>
+                  <option value="a1">Poroże 1</option>
+                  <option value="a2">Poroże 2</option>
+                  <option value="a3">Poroże 3</option>
+                  <option value="centerpc">Wyróżnione</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-id">Identyfikator (id)</label>
+                <input type="text" id="f-id" placeholder="tworzy się z nazwy">
+                <div class="hint">Zostaw puste — utworzy się automatycznie.</div>
+              </div>
+            </div>
+          </div>
 
-  <!-- ZAMÓWIENIA (Stripe) -->
-  <div class="card" style="margin-top:24px">
-    <div class="sec-title"><h2>Zamówienia (<span id="ordersCount">0</span>)</h2>
-      <button class="btn secondary small" id="ordersReload" type="button">Odśwież</button></div>
-    <div class="hint" style="margin-bottom:14px">Opłacone zamówienia ze Stripe. Pojawiają się tu automatycznie po udanej płatności.</div>
-    <div id="ordersBox"><p class="hint">Ładuję…</p></div>
+          <!-- PRAWA: zdjęcia -->
+          <div>
+            <p class="form-sec-label">Zdjęcia produktu</p>
+            <div class="gallery-editor">
+              <div class="gallery-main" id="galMain">
+                <span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>
+              </div>
+              <div class="gallery-thumbs" id="galThumbs"></div>
+              <input type="file" id="f-files" accept="image/*" multiple hidden>
+              <div class="gallery-hint" id="galHint">Pierwsze zdjęcie jest <b>główne</b>. Kliknij miniaturkę, aby
+                ustawić ją jako główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone i zapisane w bazie.</div>
+              <details class="img-url-alt">
+                <summary>…albo dodaj zdjęcie z adresu URL</summary>
+                <div class="url-add-row">
+                  <input type="url" id="f-imgurl" placeholder="https://… lub assets/moje-zdjecie.jpg">
+                  <button type="button" class="btn secondary small" id="addUrlBtn">Dodaj</button>
+                </div>
+              </details>
+            </div>
+          </div>
+
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" id="cancelEdit" type="button">Anuluj</button>
+      <button class="btn" type="submit" form="productForm" id="saveBtn">Zapisz produkt</button>
+    </div>
   </div>
 </div>
 
