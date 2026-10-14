@@ -71,8 +71,24 @@ function trOr(key, fallback){
 }
 /* nazwa/opis produktu w bieżącym języku (fallback do danych z bazy/PRODUCTS) */
 function pName(p){ return trOr('p.'+p.id+'.name', p.name); }
-function pDesc(p){ return trOr('p.'+p.id+'.desc', p.desc); }          // opis główny (krótki)
-function pDescFull(p){ return trOr('p.'+p.id+'.descFull', p.descFull || p.desc); } // opis produktu (pełny; fallback na główny)
+/* opis główny: 1) klucz i18n (produkty startowe), 2) automatyczne tłumaczenie z bazy
+   (produkty z panelu: descEn/descDe), 3) fallback do polskiego opisu. */
+function pDesc(p){
+  const key='p.'+p.id+'.desc';
+  const cur=(window.I18N&&window.I18N[LANG])||{};
+  if(key in cur) return cur[key];
+  if(LANG==='en'&&p.descEn) return p.descEn;
+  if(LANG==='de'&&p.descDe) return p.descDe;
+  return p.desc||'';
+}
+function pDescFull(p){
+  const key='p.'+p.id+'.descFull';
+  const cur=(window.I18N&&window.I18N[LANG])||{};
+  if(key in cur) return cur[key];
+  if(LANG==='en'&&(p.descFullEn||p.descEn)) return p.descFullEn||p.descEn;
+  if(LANG==='de'&&(p.descFullDe||p.descDe)) return p.descFullDe||p.descDe;
+  return p.descFull||p.desc||'';
+}
 function pTag(p){ return p.cat==='wood' ? tr('filter.wood') : tr('filter.antler'); }
 
 /* podmień wszystkie elementy z data-i18n / data-i18n-ph */
@@ -658,6 +674,21 @@ async function renderThankYou(){
 }
 
 /* ---------------- DYNAMICZNA STRONA PRODUKTU (produkt.html?id=...) ---------------- */
+// Blok specyfikacji: wymiary (cm) + dostępność (ilość sztuk).
+function pdpSpecs(p){
+  const d = (p && p.dims) || {};
+  const rows = [];
+  if(d.h!=null) rows.push(`<li><span>${tr('pdp.height')||'Wysokość'}</span><b>${d.h} cm</b></li>`);
+  if(d.w!=null) rows.push(`<li><span>${tr('pdp.width')||'Szerokość'}</span><b>${d.w} cm</b></li>`);
+  if(d.d!=null) rows.push(`<li><span>${tr('pdp.depth')||'Głębokość'}</span><b>${d.d} cm</b></li>`);
+  if(typeof p.stock === 'number'){
+    rows.push(p.stock>0
+      ? `<li><span>${tr('pdp.availability')||'Dostępność'}</span><b class="in-stock">${(tr('pdp.inStock')||'Na stanie')}: ${p.stock} ${tr('pdp.pcs')||'szt.'}</b></li>`
+      : `<li><span>${tr('pdp.availability')||'Dostępność'}</span><b class="out-stock">${tr('pdp.outStock')||'Chwilowo niedostępny'}</b></li>`);
+  }
+  return rows.length ? `<ul class="pdp-specs">${rows.join('')}</ul>` : '';
+}
+
 function renderPdp(){
   const root = document.getElementById('pdpRoot');
   if(!root) return;
@@ -713,13 +744,14 @@ function renderPdp(){
         <h1>${pName(p)}</h1>
         <div class="pdp-price">${fmtPrice(p.price)}</div>
         <p class="pdp-desc">${pDescFull(p)}</p>
+        ${pdpSpecs(p)}
         <div class="pdp-actions">
           <div class="qty-stepper">
             <button type="button" class="qty-btn" id="pdpDec" aria-label="Mniej">–</button>
             <span id="pdpQty">1</span>
             <button type="button" class="qty-btn" id="pdpInc" aria-label="Więcej">+</button>
           </div>
-          <button class="btn btn-primary pdp-add" type="button" data-id="${p.id}" id="pdpAdd">${tr('pdp.add')||'Do koszyka'}</button>
+          <button class="btn btn-primary pdp-add" type="button" data-id="${p.id}" id="pdpAdd"${(typeof p.stock==='number'&&p.stock<=0)?' disabled':''}>${(typeof p.stock==='number'&&p.stock<=0)?(tr('pdp.outStock')||'Chwilowo niedostępny'):(tr('pdp.add')||'Do koszyka')}</button>
         </div>
         <a href="${collectionHref}" class="pdp-back">${tr('pdp.back')||'← Wróć do kolekcji'}</a>
       </div>

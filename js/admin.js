@@ -58,6 +58,7 @@ const el = {
 const f = {
   name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
   desc: $('f-desc'), descFull: $('f-descfull'), art: $('f-art'), id: $('f-id'),
+  stock: $('f-stock'), dimH: $('f-dimh'), dimW: $('f-dimw'), dimD: $('f-dimd'),
 };
 const gal = {
   main: $('galMain'),
@@ -182,18 +183,20 @@ function renderGallery() {
   const main = gallery[0];
   if (main) {
     gal.main.style.backgroundImage = cssUrl(main.url);
-    gal.main.innerHTML = '<span class="gallery-main-badge">Główne</span>';
+    gal.main.innerHTML = '<span class="gallery-main-badge">Główne</span>'
+      + `<button type="button" class="gal-main-del" data-key="${main.key}" title="Usuń zdjęcie główne" aria-label="Usuń">×</button>`;
   } else {
     gal.main.style.backgroundImage = '';
-    gal.main.innerHTML = '<span class="ph">Brak zdjęć — dodaj pierwsze poniżej</span>';
+    gal.main.innerHTML = '<span class="ph">Brak zdjęcia głównego — dodaj poniżej</span>';
   }
 
-  const thumbs = gallery.map((item) => `
-    <div class="gthumb${item === main ? ' is-main' : ''}" data-key="${item.key}"
-         title="${item === main ? 'Zdjęcie główne' : 'Kliknij, aby ustawić jako główne'}"
+  // dodatkowe zdjęcia (galeria) = wszystko poza pierwszym (głównym)
+  const extra = gallery.slice(1);
+  const thumbs = extra.map((item) => `
+    <div class="gthumb" data-key="${item.key}" title="Kliknij, aby ustawić jako zdjęcie główne"
          style="background-image:${cssUrl(item.url)}" tabindex="0">
       <button type="button" class="del" data-key="${item.key}" title="Usuń zdjęcie" aria-label="Usuń zdjęcie">×</button>
-      <span class="star" aria-hidden="true">★</span>
+      <span class="setmain">Ustaw główne</span>
     </div>`).join('');
 
   const canAdd = gallery.length < MAX_PHOTOS;
@@ -202,6 +205,7 @@ function renderGallery() {
     : '';
   gal.thumbs.innerHTML = thumbs + addTile;
 
+  // klik w dodatkowe zdjęcie → ustaw je jako główne
   gal.thumbs.querySelectorAll('.gthumb:not(.add)').forEach((node) => {
     const key = node.getAttribute('data-key');
     node.addEventListener('click', (e) => {
@@ -215,6 +219,8 @@ function renderGallery() {
   gal.thumbs.querySelectorAll('.del').forEach((btn) => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); removePhoto(btn.getAttribute('data-key')); });
   });
+  const mainDel = gal.main.querySelector('.gal-main-del');
+  if (mainDel) mainDel.addEventListener('click', (e) => { e.stopPropagation(); removePhoto(mainDel.getAttribute('data-key')); });
   const addTileEl = $('galAddTile');
   if (addTileEl) addTileEl.addEventListener('click', () => gal.files.click());
 }
@@ -379,12 +385,9 @@ function closeModal() {
 }
 el.modalClose.addEventListener('click', closeModal);
 el.cancelEdit.addEventListener('click', closeModal);
-el.productModal.addEventListener('mousedown', (e) => {
-  if (e.target === el.productModal) closeModal(); // klik w tło zamyka
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !el.productModal.classList.contains('hidden')) closeModal();
-});
+// UWAGA: celowo NIE zamykamy modala klikiem w tło ani klawiszem Esc,
+// żeby przypadkowe kliknięcie nie wykasowało wypełnionego formularza.
+// Zamknięcie tylko przez „×" lub „Anuluj".
 el.addProductBtn.addEventListener('click', () => {
   clearForm();
   el.formTitle.textContent = 'Dodaj produkt';
@@ -397,6 +400,11 @@ function fillForm(p) {
   f.name.value = p.name || '';
   f.cat.value = p.cat || 'wood';
   f.price.value = p.price != null ? p.price : '';
+  f.stock.value = p.stock != null ? p.stock : '';
+  const d = p.dims || {};
+  f.dimH.value = d.h != null ? d.h : '';
+  f.dimW.value = d.w != null ? d.w : '';
+  f.dimD.value = d.d != null ? d.d : '';
   f.desc.value = p.desc || '';
   f.descFull.value = p.descFull || '';
   f.art.value = p.art || 'w1';
@@ -425,8 +433,8 @@ function clearForm() {
   originalIds = [];
   gal.urlInput.value = '';
   renderGallery();
-  gal.hint.textContent = 'Pierwsze zdjęcie jest głównym. Kliknij miniaturkę, aby ustawić ją jako '
-    + 'główną. Możesz wgrać kilka plików naraz (JPG/PNG) — zostaną pomniejszone i zapisane w bazie.';
+  gal.hint.textContent = 'Kliknij „+", aby dodać zdjęcia. Pierwsze zdjęcie jest głównym — '
+    + 'aby zmienić główne, kliknij inne zdjęcie w galerii. Pliki (JPG/PNG) zostaną pomniejszone i zapisane w bazie.';
 }
 function startEdit(id) {
   const p = PRODUCTS.find((x) => x.id === id);
@@ -465,6 +473,10 @@ el.productForm.addEventListener('submit', async (e) => {
     name: f.name.value.trim(),
     cat: f.cat.value,
     price: Number(f.price.value) || 0,
+    stock: f.stock.value === '' ? 1 : (Number(f.stock.value) || 0),
+    dimH: f.dimH.value === '' ? null : Number(f.dimH.value),
+    dimW: f.dimW.value === '' ? null : Number(f.dimW.value),
+    dimD: f.dimD.value === '' ? null : Number(f.dimD.value),
     desc: f.desc.value.trim(),
     descFull: f.descFull.value.trim(),
     art: f.art.value,
@@ -474,7 +486,7 @@ el.productForm.addEventListener('submit', async (e) => {
 
   const editingId = el.editingId.value;
   el.saveBtn.disabled = true;
-  el.saveBtn.textContent = 'Zapisywanie…';
+  el.saveBtn.textContent = 'Zapisywanie i tłumaczenie…';
   try {
     let productId = editingId;
     if (editingId) {

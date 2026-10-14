@@ -96,6 +96,15 @@ async function ensureSchema() {
   // Drugi opis: "descr" = opis główny (krótki, na liście), "desc_full" = opis produktu
   // (pełny, na stronie produktu). ADD ... IF NOT EXISTS — bezpieczne dla istniejącej bazy.
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full TEXT NOT NULL DEFAULT '';`;
+  // Ilość sztuk na stanie, wymiary (cm) oraz automatyczne tłumaczenia opisów (EN/DE).
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 1;`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS dim_h REAL;`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS dim_w REAL;`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS dim_d REAL;`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS descr_en TEXT NOT NULL DEFAULT '';`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS descr_de TEXT NOT NULL DEFAULT '';`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full_en TEXT NOT NULL DEFAULT '';`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full_de TEXT NOT NULL DEFAULT '';`;
   // Zdjęcia produktów wgrane w panelu trzymamy w bazie (bez zewnętrznego storage / R2).
   // Osobna tabela, żeby duże bajty nie obciążały zapytań o listę produktów.
   // (starsza tabela 1:1 — zostawiamy dla zgodności i migracji)
@@ -335,17 +344,57 @@ function isDataUrl(v) {
 
 // Zamień wiersz z bazy na obiekt produktu w formacie, którego używa frontend.
 function rowToProduct(r) {
+  const num = (v) => (v == null || v === '' ? null : Number(v));
   return {
     id: r.id,
     name: r.name,
     cat: r.cat,
     tag: r.tag,
     price: Number(r.price),
-    desc: r.descr,          // opis główny (krótki) — frontend używa pola „desc"
-    descFull: r.desc_full || '', // opis produktu (pełny) — strona produktu
+    desc: r.descr,          // opis główny (krótki, PL) — frontend używa pola „desc"
+    descFull: r.desc_full || '', // opis produktu (pełny, PL) — strona produktu
+    // automatyczne tłumaczenia opisów (EN/DE)
+    descEn: r.descr_en || '', descDe: r.descr_de || '',
+    descFullEn: r.desc_full_en || '', descFullDe: r.desc_full_de || '',
+    // ilość sztuk i wymiary (cm)
+    stock: r.stock == null ? null : Number(r.stock),
+    dims: { h: num(r.dim_h), w: num(r.dim_w), d: num(r.dim_d) },
     art: r.art,
     img: r.img,
   };
+}
+
+// ---------- Automatyczne tłumaczenie opisów (PL → EN/DE) ----------
+// Używa publicznego endpointu Google (gtx), bez klucza. Best-effort: przy błędzie
+// lub timeoucie zwraca tekst oryginalny (PL), żeby zapis produktu się nie wywalił.
+async function translateText(text, target) {
+  const t = String(text || '').trim();
+  if (!t) return '';
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 8000);
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl='
+      + encodeURIComponent(target) + '&dt=t&q=' + encodeURIComponent(t);
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    clearTimeout(to);
+    if (!res.ok) throw new Error('translate http ' + res.status);
+    const data = await res.json();
+    if (Array.isArray(data) && Array.isArray(data[0])) {
+      const out = data[0].map((seg) => (seg && seg[0]) ? seg[0] : '').join('');
+      if (out.trim()) return out;
+    }
+  } catch (e) {
+    console.error('[translate]', target, (e && e.message) || e);
+  }
+  return t; // fallback: oryginał (PL)
+}
+// Przetłumacz opis główny i opis produktu na EN i DE (równolegle).
+async function translateDescriptions(descPl, descFullPl) {
+  const [descEn, descDe, descFullEn, descFullDe] = await Promise.all([
+    translateText(descPl, 'en'), translateText(descPl, 'de'),
+    translateText(descFullPl, 'en'), translateText(descFullPl, 'de'),
+  ]);
+  return { descEn, descDe, descFullEn, descFullDe };
 }
 
 // ---------- Autoryzacja ----------
@@ -567,6 +616,7 @@ module.exports = {
   sql,
   ensureSchema,
   rowToProduct,
+  translateDescriptions,
   makeToken,
   isAuthed,
   requireAuth,
