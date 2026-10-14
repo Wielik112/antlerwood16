@@ -105,6 +105,9 @@ async function ensureSchema() {
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS descr_de TEXT NOT NULL DEFAULT '';`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full_en TEXT NOT NULL DEFAULT '';`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS desc_full_de TEXT NOT NULL DEFAULT '';`;
+  // Tłumaczenia nazwy produktu (EN/DE).
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS name_en TEXT NOT NULL DEFAULT '';`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS name_de TEXT NOT NULL DEFAULT '';`;
   // Zdjęcia produktów wgrane w panelu trzymamy w bazie (bez zewnętrznego storage / R2).
   // Osobna tabela, żeby duże bajty nie obciążały zapytań o listę produktów.
   // (starsza tabela 1:1 — zostawiamy dla zgodności i migracji)
@@ -348,6 +351,7 @@ function rowToProduct(r) {
   return {
     id: r.id,
     name: r.name,
+    nameEn: r.name_en || '', nameDe: r.name_de || '',
     cat: r.cat,
     tag: r.tag,
     price: Number(r.price),

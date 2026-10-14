@@ -69,8 +69,16 @@ function trOr(key, fallback){
   if(key in pl) return pl[key];
   return fallback;
 }
-/* nazwa/opis produktu w bieżącym języku (fallback do danych z bazy/PRODUCTS) */
-function pName(p){ return trOr('p.'+p.id+'.name', p.name); }
+/* nazwa produktu w bieżącym języku: 1) klucz i18n (produkty startowe),
+   2) tłumaczenie z bazy (nameEn/nameDe), 3) fallback do nazwy polskiej. */
+function pName(p){
+  const key='p.'+p.id+'.name';
+  const cur=(window.I18N&&window.I18N[LANG])||{};
+  if(key in cur) return cur[key];
+  if(LANG==='en'&&p.nameEn) return p.nameEn;
+  if(LANG==='de'&&p.nameDe) return p.nameDe;
+  return p.name||'';
+}
 /* opis główny: 1) klucz i18n (produkty startowe), 2) automatyczne tłumaczenie z bazy
    (produkty z panelu: descEn/descDe), 3) fallback do polskiego opisu. */
 function pDesc(p){
