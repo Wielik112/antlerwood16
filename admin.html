@@ -133,6 +133,13 @@
   .form-sec-label{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
   .dims-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .gal-sublabel{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+  .lbl-note{text-transform:none;letter-spacing:0;color:var(--muted);font-size:11px}
+  .lang-fields{display:flex;flex-direction:column;gap:8px}
+  .lf{display:flex;gap:8px;align-items:stretch}
+  .lf-tag{flex:0 0 36px;display:flex;align-items:flex-start;justify-content:center;padding-top:11px;
+    font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.06em;color:var(--accent);
+    background:var(--bg);border:1px solid var(--line);border-radius:8px}
+  .lf textarea{flex:1;min-height:58px}
   /* ---------- galeria zdjęć w formularzu ---------- */
   .gallery-editor{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
   .gallery-main{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;border:1px solid var(--line);
@@ -247,7 +254,6 @@
         <h1>Produkty</h1>
         <div class="view-actions">
           <input type="search" id="prodSearch" class="search" placeholder="Szukaj produktu…">
-          <button class="btn secondary small" id="translateAllBtn" type="button" title="Przetłumacz brakujące opisy na EN/DE">Przetłumacz opisy</button>
           <button class="btn secondary small" id="reloadBtn" type="button">Odśwież</button>
           <button class="btn" id="addProductBtn" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
@@ -340,15 +346,22 @@
               </div>
             </div>
             <div class="field">
-              <label for="f-desc">Opis główny</label>
-              <textarea id="f-desc" placeholder="Krótki opis (1–2 zdania)…"></textarea>
-              <div class="hint">Pokazywany na kaflach w sklepie i na listach produktów.</div>
+              <label>Opis główny <span class="lbl-note">(krótki — na kaflach w sklepie)</span></label>
+              <div class="lang-fields">
+                <div class="lf"><span class="lf-tag">PL</span><textarea id="f-desc" placeholder="Krótki opis po polsku…"></textarea></div>
+                <div class="lf"><span class="lf-tag">EN</span><textarea id="f-desc-en" placeholder="Short description in English…"></textarea></div>
+                <div class="lf"><span class="lf-tag">DE</span><textarea id="f-desc-de" placeholder="Kurzbeschreibung auf Deutsch…"></textarea></div>
+              </div>
             </div>
             <div class="field">
-              <label for="f-descfull">Opis produktu</label>
-              <textarea id="f-descfull" placeholder="Pełny opis: materiał, wymiary, wykończenie, pielęgnacja…" style="min-height:150px"></textarea>
-              <div class="hint">Pełny, szczegółowy opis na stronie produktu. Opisy są
-                <b>automatycznie tłumaczone</b> na angielski i niemiecki przy zapisie.</div>
+              <label>Opis produktu <span class="lbl-note">(pełny — na stronie produktu)</span></label>
+              <div class="lang-fields">
+                <div class="lf"><span class="lf-tag">PL</span><textarea id="f-descfull" style="min-height:120px" placeholder="Pełny opis po polsku…"></textarea></div>
+                <div class="lf"><span class="lf-tag">EN</span><textarea id="f-descfull-en" style="min-height:120px" placeholder="Full description in English…"></textarea></div>
+                <div class="lf"><span class="lf-tag">DE</span><textarea id="f-descfull-de" style="min-height:120px" placeholder="Vollständige Beschreibung auf Deutsch…"></textarea></div>
+              </div>
+              <div class="hint">Wpisz/wklej opis w każdym języku. Puste pole EN/DE → na stronie
+                pokaże się wtedy wersja polska.</div>
             </div>
             <div class="row">
               <div class="field">

@@ -35,7 +35,6 @@ const el = {
   prodEmpty: $('prodEmpty'),
   prodSearch: $('prodSearch'),
   addProductBtn: $('addProductBtn'),
-  translateAllBtn: $('translateAllBtn'),
   reloadBtn: $('reloadBtn'),
   seedBox: $('seedBox'),
   seedBtn: $('seedBtn'),
@@ -58,7 +57,9 @@ const el = {
 
 const f = {
   name: $('f-name'), cat: $('f-cat'), price: $('f-price'),
-  desc: $('f-desc'), descFull: $('f-descfull'), art: $('f-art'), id: $('f-id'),
+  desc: $('f-desc'), descEn: $('f-desc-en'), descDe: $('f-desc-de'),
+  descFull: $('f-descfull'), descFullEn: $('f-descfull-en'), descFullDe: $('f-descfull-de'),
+  art: $('f-art'), id: $('f-id'),
   stock: $('f-stock'), dimH: $('f-dimh'), dimW: $('f-dimw'), dimD: $('f-dimd'),
 };
 const gal = {
@@ -114,55 +115,6 @@ function escapeHtml(s) {
   ));
 }
 function fmtPrice(v) { return Number(v || 0).toLocaleString('pl-PL') + ' zł'; }
-
-/* ---------- automatyczne tłumaczenie opisów (PL → EN/DE) ----------
-   Tłumaczymy w przeglądarce admina przez darmowe API MyMemory (bez klucza,
-   z obsługą CORS). Długie teksty dzielimy na kawałki ≤450 znaków na granicy zdań.
-   Best-effort: przy błędzie zwracamy '' (serwer użyje wtedy DeepL, jeśli jest
-   klucz, albo zostawi tekst polski). */
-async function mmTranslate(text, target) {
-  const t = String(text || '').trim();
-  if (!t) return '';
-  const chunks = [];
-  let buf = '';
-  for (const part of t.split(/(?<=[.!?])\s+/)) {
-    if (buf && (buf.length + 1 + part.length) > 450) { chunks.push(buf); buf = part; }
-    else buf = buf ? buf + ' ' + part : part;
-  }
-  if (buf) chunks.push(buf);
-
-  const outs = [];
-  for (const c of chunks) {
-    const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(c) + '&langpair=pl|' + target;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('MyMemory ' + res.status);
-    const data = await res.json();
-    // MyMemory potrafi zwrócić HTTP 200, a błąd (np. limit dzienny) w responseStatus.
-    const st = data && data.responseStatus;
-    if (st && String(st) !== '200') {
-      throw new Error('MyMemory status ' + st + ': ' + (data.responseDetails || ''));
-    }
-    const out = data && data.responseData && data.responseData.translatedText;
-    if (!out) throw new Error('MyMemory: pusta odpowiedź');
-    outs.push(out);
-  }
-  return outs.join(' ');
-}
-
-// Zwraca { descEn, descDe, descFullEn, descFullDe } (puste, jeśli tłumaczenie padło).
-async function translatePayload(descPl, descFullPl) {
-  try {
-    const [descEn, descDe, descFullEn, descFullDe] = await Promise.all([
-      mmTranslate(descPl, 'en'), mmTranslate(descPl, 'de'),
-      mmTranslate(descFullPl, 'en'), mmTranslate(descFullPl, 'de'),
-    ]);
-    return { descEn, descDe, descFullEn, descFullDe };
-  } catch (e) {
-    console.warn('[tłumaczenie] nie powiodło się:', e && e.message);
-    toast('Nie udało się automatycznie przetłumaczyć opisów — zapisuję bez tłumaczenia.', 'err');
-    return {};
-  }
-}
 function fmtGrosze(v, cur) {
   const amount = Number(v || 0) / 100;
   const c = String(cur || 'pln').toUpperCase();
@@ -456,7 +408,11 @@ function fillForm(p) {
   f.dimW.value = d.w != null ? d.w : '';
   f.dimD.value = d.d != null ? d.d : '';
   f.desc.value = p.desc || '';
+  f.descEn.value = p.descEn || '';
+  f.descDe.value = p.descDe || '';
   f.descFull.value = p.descFull || '';
+  f.descFullEn.value = p.descFullEn || '';
+  f.descFullDe.value = p.descFullDe || '';
   f.art.value = p.art || 'w1';
   f.id.value = p.id || '';
 
@@ -528,7 +484,11 @@ el.productForm.addEventListener('submit', async (e) => {
     dimW: f.dimW.value === '' ? null : Number(f.dimW.value),
     dimD: f.dimD.value === '' ? null : Number(f.dimD.value),
     desc: f.desc.value.trim(),
+    descEn: f.descEn.value.trim(),
+    descDe: f.descDe.value.trim(),
     descFull: f.descFull.value.trim(),
+    descFullEn: f.descFullEn.value.trim(),
+    descFullDe: f.descFullDe.value.trim(),
     art: f.art.value,
     id: f.id.value.trim(),
   };
@@ -536,13 +496,8 @@ el.productForm.addEventListener('submit', async (e) => {
 
   const editingId = el.editingId.value;
   el.saveBtn.disabled = true;
+  el.saveBtn.textContent = 'Zapisywanie…';
   try {
-    // Automatyczne tłumaczenie opisów (w przeglądarce) — dołączamy do payloadu.
-    if (payload.desc || payload.descFull) {
-      el.saveBtn.textContent = 'Tłumaczę opisy…';
-      Object.assign(payload, await translatePayload(payload.desc, payload.descFull));
-    }
-    el.saveBtn.textContent = 'Zapisywanie…';
     let productId = editingId;
     if (editingId) {
       await api('/api/products/' + encodeURIComponent(editingId), {
@@ -593,39 +548,6 @@ el.seedBtn.addEventListener('click', async () => {
 });
 
 el.reloadBtn.addEventListener('click', loadProducts);
-
-/* ---------- masowe tłumaczenie brakujących opisów ---------- */
-async function translateAllMissing() {
-  const need = PRODUCTS.filter((p) => (p.desc && !p.descEn) || (p.descFull && !p.descFullEn));
-  if (!need.length) { toast('Wszystkie opisy są już przetłumaczone.', 'ok'); return; }
-  if (!confirm(`Przetłumaczyć opisy ${need.length} produktu(ów) na angielski i niemiecki?`)) return;
-  el.translateAllBtn.disabled = true;
-  const num = (v) => (v == null ? null : v);
-  let done = 0;
-  try {
-    for (const p of need) {
-      el.translateAllBtn.textContent = `Tłumaczę… ${done + 1}/${need.length}`;
-      const tr = await translatePayload(p.desc || '', p.descFull || '');
-      if (!tr || !tr.descEn) continue; // tłumaczenie padło — pomiń, nie psuj produktu
-      const d = p.dims || {};
-      const payload = {
-        name: p.name, cat: p.cat, price: p.price, stock: p.stock,
-        dimH: num(d.h), dimW: num(d.w), dimD: num(d.d),
-        desc: p.desc || '', descFull: p.descFull || '', art: p.art, id: p.id, ...tr,
-      };
-      await api('/api/products/' + encodeURIComponent(p.id), { method: 'PUT', body: JSON.stringify(payload) });
-      done += 1;
-    }
-    toast(done ? `Przetłumaczono ${done} produkt(ów).` : 'Nie udało się przetłumaczyć — spróbuj ponownie później.', done ? 'ok' : 'err');
-    await loadProducts();
-  } catch (err) {
-    toast(err.message, 'err');
-  } finally {
-    el.translateAllBtn.disabled = false;
-    el.translateAllBtn.textContent = 'Przetłumacz opisy';
-  }
-}
-if (el.translateAllBtn) el.translateAllBtn.addEventListener('click', translateAllMissing);
 
 /* ---------- zamówienia (Stripe) ---------- */
 async function loadOrders() {
