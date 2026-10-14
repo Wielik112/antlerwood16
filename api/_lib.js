@@ -365,34 +365,38 @@ function rowToProduct(r) {
 }
 
 // ---------- Automatyczne tłumaczenie opisów (PL → EN/DE) ----------
-// Używa publicznego endpointu Google (gtx), bez klucza. Best-effort: przy błędzie
-// lub timeoucie zwraca tekst oryginalny (PL), żeby zapis produktu się nie wywalił.
-async function translateText(text, target) {
+// Tłumaczenie serwerowe przez DeepL — używane TYLKO, gdy ustawiono DEEPL_API_KEY
+// (Vercel → Settings → Environment Variables). Darmowy klucz kończy się na ":fx".
+// Bez klucza zwraca '' — wtedy używamy tłumaczeń przysłanych z panelu (MyMemory)
+// lub, w ostateczności, tekstu polskiego.
+async function deeplTranslate(text, targetUpper) {
+  const key = process.env.DEEPL_API_KEY;
   const t = String(text || '').trim();
-  if (!t) return '';
+  if (!key || !t) return '';
   try {
+    const host = key.trim().endsWith(':fx') ? 'https://api-free.deepl.com' : 'https://api.deepl.com';
     const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), 8000);
-    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl='
-      + encodeURIComponent(target) + '&dt=t&q=' + encodeURIComponent(t);
-    const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const to = setTimeout(() => ctrl.abort(), 9000);
+    const res = await fetch(host + '/v2/translate', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { Authorization: 'DeepL-Auth-Key ' + key, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'text=' + encodeURIComponent(t) + '&source_lang=PL&target_lang=' + encodeURIComponent(targetUpper),
+    });
     clearTimeout(to);
-    if (!res.ok) throw new Error('translate http ' + res.status);
+    if (!res.ok) throw new Error('deepl http ' + res.status);
     const data = await res.json();
-    if (Array.isArray(data) && Array.isArray(data[0])) {
-      const out = data[0].map((seg) => (seg && seg[0]) ? seg[0] : '').join('');
-      if (out.trim()) return out;
-    }
+    const out = data && data.translations && data.translations[0] && data.translations[0].text;
+    return out || '';
   } catch (e) {
-    console.error('[translate]', target, (e && e.message) || e);
+    console.error('[deepl]', targetUpper, (e && e.message) || e);
+    return '';
   }
-  return t; // fallback: oryginał (PL)
 }
-// Przetłumacz opis główny i opis produktu na EN i DE (równolegle).
+// Zwraca tłumaczenia opisów na EN i DE (puste stringi, jeśli DeepL niedostępny).
 async function translateDescriptions(descPl, descFullPl) {
   const [descEn, descDe, descFullEn, descFullDe] = await Promise.all([
-    translateText(descPl, 'en'), translateText(descPl, 'de'),
-    translateText(descFullPl, 'en'), translateText(descFullPl, 'de'),
+    deeplTranslate(descPl, 'EN'), deeplTranslate(descPl, 'DE'),
+    deeplTranslate(descFullPl, 'EN'), deeplTranslate(descFullPl, 'DE'),
   ]);
   return { descEn, descDe, descFullEn, descFullDe };
 }

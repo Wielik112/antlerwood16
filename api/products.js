@@ -36,6 +36,11 @@ function validate(body, { requireId } = {}) {
   const price = Math.max(0, Math.round(Number(body.price) || 0));
   const descr = String(body.desc || '').trim();       // opis główny (krótki)
   const descFull = String(body.descFull || '').trim(); // opis produktu (pełny)
+  // Tłumaczenia przysłane z panelu (tłumaczone w przeglądarce admina). Opcjonalne.
+  const descEn = String(body.descEn || '').trim();
+  const descDe = String(body.descDe || '').trim();
+  const descFullEn = String(body.descFullEn || '').trim();
+  const descFullDe = String(body.descFullDe || '').trim();
   const img = String(body.img || '').trim();
   const tag = String(body.tag || '').trim();
 
@@ -55,7 +60,27 @@ function validate(body, { requireId } = {}) {
   if (!id && requireId) id = slugify(name);
   if (requireId && !id) return { error: 'Nie udało się utworzyć identyfikatora (id) z nazwy.' };
 
-  return { data: { id, name, cat, tag, price, descr, descFull, art, img, stock, dimH, dimW, dimD } };
+  return { data: { id, name, cat, tag, price, descr, descFull, art, img, stock, dimH, dimW, dimD,
+    descEn, descDe, descFullEn, descFullDe } };
+}
+
+// Ustal ostateczne tłumaczenia: 1) z panelu (MyMemory), 2) serwerowo DeepL (jeśli
+// jest klucz) tam, gdzie brak, 3) ostatecznie tekst polski (żeby nie zapisać pustych).
+async function resolveTranslations(data) {
+  let { descEn, descDe, descFullEn, descFullDe } = data;
+  if (!descEn || !descDe || !descFullEn || !descFullDe) {
+    const s = await translateDescriptions(data.descr, data.descFull);
+    descEn = descEn || s.descEn;
+    descDe = descDe || s.descDe;
+    descFullEn = descFullEn || s.descFullEn;
+    descFullDe = descFullDe || s.descFullDe;
+  }
+  return {
+    descEn: descEn || data.descr,
+    descDe: descDe || data.descr,
+    descFullEn: descFullEn || data.descFull,
+    descFullDe: descFullDe || data.descFull,
+  };
 }
 
 module.exports = wrap(async function handler(req, res) {
@@ -78,8 +103,8 @@ module.exports = wrap(async function handler(req, res) {
       const { data, error } = validate(body);
       if (error) return res.status(400).json({ error });
 
-      // Automatyczne tłumaczenie opisów na EN/DE (best-effort, fallback = PL).
-      const tr = await translateDescriptions(data.descr, data.descFull);
+      // Tłumaczenia opisów: z panelu (MyMemory) → DeepL (jeśli klucz) → fallback PL.
+      const tr = await resolveTranslations(data);
 
       // Zdjęcie główne (products.img) jest wyliczane z galerii — nie nadpisujemy go tutaj
       // danymi tekstowymi formularza. Aktualizujemy tylko pozostałe pola produktu.
@@ -148,8 +173,8 @@ module.exports = wrap(async function handler(req, res) {
     const ord = await sql`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM products;`;
     const sortOrder = ord.rows[0].next;
 
-    // Automatyczne tłumaczenie opisów na EN/DE (best-effort, fallback = PL).
-    const tr = await translateDescriptions(data.descr, data.descFull);
+    // Tłumaczenia opisów: z panelu (MyMemory) → DeepL (jeśli klucz) → fallback PL.
+    const tr = await resolveTranslations(data);
 
     // Produkt tworzymy z pustym img — zdjęcie(a) trafiają do galerii (product_photos),
     // a products.img jest z niej wyliczane (pierwsze zdjęcie = główne).
