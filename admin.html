@@ -256,6 +256,7 @@
         <h1>Produkty</h1>
         <div class="view-actions">
           <input type="search" id="prodSearch" class="search" placeholder="Szukaj produktu…">
+          <button class="btn danger small" id="deleteAllBtn" type="button" title="Usuń wszystkie produkty z bazy">Usuń wszystkie</button>
           <button class="btn secondary small" id="reloadBtn" type="button">Odśwież</button>
           <button class="btn" id="addProductBtn" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
@@ -264,8 +265,7 @@
         </div>
       </div>
       <div id="seedBox" class="empty hidden">
-        <p>Baza produktów jest pusta.</p>
-        <button class="btn small" id="seedBtn" type="button">Zaimportuj startowe 9 produktów</button>
+        <p>Baza produktów jest pusta. Kliknij <b>„Dodaj produkt"</b>, aby dodać pierwszy.</p>
       </div>
       <div class="table-wrap" id="tableWrap">
         <table class="ptable">

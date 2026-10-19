@@ -286,6 +286,7 @@ section.shop{padding:40px 0 60px}
   padding:11px 22px;border:1px solid var(--line);border-radius:40px;color:var(--muted);cursor:pointer;transition:.25s;background:transparent}
 .chip.active,.chip:hover{border-color:var(--bronze);color:var(--char);background:var(--bronze)}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.shop-empty{grid-column:1/-1;text-align:center;color:var(--muted);font-size:1.1rem;padding:70px 20px;border:1px dashed rgba(255,255,255,.12);border-radius:16px}
 .card{background:linear-gradient(180deg,var(--plank2),var(--plank));border:1px solid var(--line);border-radius:4px;overflow:hidden;
   transition:transform .4s,box-shadow .4s,border-color .4s;cursor:pointer;display:flex;flex-direction:column}
 .card:hover{transform:translateY(-8px);box-shadow:var(--shadow);border-color:var(--bronze)}

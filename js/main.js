@@ -6,20 +6,10 @@
    - "art": zapasowe tło CSS w kolorach marki — pokaże się automatycznie, gdyby zdjęcie się nie załadowało.
 */
 /* PRODUCTS = dane produktów.
-   Poniższa lista to DANE STARTOWE / FALLBACK — używane, gdy backend (API) nie odpowiada
-   (np. strona otwarta lokalnie z pliku). Na Vercelu z podpiętą bazą produkty są pobierane
-   z /api/products (patrz loadProductsFromApi na końcu pliku) i ta lista jest podmieniana. */
-let PRODUCTS = [
-  {id:"polka-dab",name:"Półka z litego dębu",cat:"wood",art:"w1",tag:"Lite drewno",price:590,desc:"Masywna półka ścienna z naturalnym rysunkiem słojów, olejowana ręcznie.",img:"https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?w=800&q=80&auto=format&fit=crop"},
-  {id:"stol-plaster",name:"Stół z plastra drewna",cat:"wood",art:"w2",tag:"Lite drewno",price:2400,desc:"Blat z pojedynczego plastra pnia, surowa krawędź, stalowe nogi.",img:"https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=800&q=80&auto=format&fit=crop"},
-  {id:"wieszak-deska",name:"Wieszak deska i poroże",cat:"antler",art:"a1",tag:"Poroże",price:340,desc:"Deska z litego drewna z autentycznym porożem jako haki. Jeden egzemplarz.",img:"https://images.unsplash.com/photo-1509660933844-6910e12765a0?w=800&q=80&auto=format&fit=crop"},
-  {id:"komoda",name:"Komoda rustykalna",cat:"wood",art:"w3",tag:"Lite drewno",price:3200,desc:"Komoda z litego drewna z akcentem poroża przy uchwytach.",img:"https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=800&q=80&auto=format&fit=crop"},
-  {id:"stojak-noze",name:"Stojak na noże z poroża",cat:"antler",art:"a2",tag:"Poroże",price:420,desc:"Specjalistyczny ekspozytor kolekcjonerski na noże z naturalnego poroża.",img:"https://images.unsplash.com/photo-1593618998160-e34014e67546?w=800&q=80&auto=format&fit=crop"},
-  {id:"organizer",name:"Organizer na biżuterię",cat:"antler",art:"a3",tag:"Poroże",price:210,desc:"Stojak na pierścionki i klucze z rozgałęzień poroża na drewnianej bazie.",img:"https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=800&q=80&auto=format&fit=crop"},
-  {id:"wieszak-galaz",name:"Wieszak z gałęzi",cat:"wood",art:"w1",tag:"Lite drewno",price:260,desc:"Wieszak z przepołowionej naturalnej gałęzi, surowy, organiczny kształt.",img:"https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800&q=80&auto=format&fit=crop"},
-  {id:"ekspozytor-miecze",name:"Ekspozytor na miecze",cat:"antler",art:"centerpc",tag:"Poroże",price:680,desc:"Unikalny wieszak na miecze z poroża, mocny akcent w rustykalnym wnętrzu.",img:"https://images.unsplash.com/photo-1520697830682-bbb6e85e2b0b?w=800&q=80&auto=format&fit=crop"},
-  {id:"stolek-poroze",name:"Stołek z poroża",cat:"antler",art:"a2",tag:"Poroże",price:1150,desc:"Stołek wykonany w całości z użyciem poroża, rzeźbiarska forma użytkowa.",img:"https://images.unsplash.com/photo-1503602642458-232111445657?w=800&q=80&auto=format&fit=crop"},
-];
+   Lista startowa/fallback jest celowo PUSTA — sklep nie ma żadnych produktów,
+   dopóki nie dodasz ich w panelu admina. Na Vercelu z podpiętą bazą produkty są
+   pobierane z /api/products (patrz loadProductsFromApi na końcu pliku). */
+let PRODUCTS = [];
 
 /* Przelicznik PLN → EUR. Ceny w bazie/panelu podawane są w złotówkach;
    przy języku EN/DE są automatycznie przeliczane na euro. Zmień wartość,
@@ -164,8 +154,13 @@ function renderProducts(filter){
   const grid = document.getElementById('grid');
   if(!grid) return;
   filter = filter || grid.getAttribute('data-filter') || 'all';
-  grid.innerHTML = PRODUCTS.map(p=>{
-    if(filter!=="all" && p.cat!==filter) return "";
+  const items = PRODUCTS.filter((p) => filter === 'all' || p.cat === filter);
+  if(!items.length){
+    grid.classList.remove('stagger','in');
+    grid.innerHTML = `<p class="shop-empty">${tr('shop.empty')||'Wkrótce dodamy produkty. Zapraszamy niebawem!'}</p>`;
+    return;
+  }
+  grid.innerHTML = items.map(p=>{
     // Zdjęcie z fallbackiem: jeśli obraz się nie załaduje, pokazujemy tło CSS w kolorach marki.
     const visual = p.img
       ? `<div class="art ${p.art}"></div><img src="${p.img}" alt="${pName(p)}" loading="lazy" onerror="this.style.display='none'">`
@@ -282,9 +277,9 @@ function cartItemHTML(i,variant){
   const lineTotal = fmtPrice(p.price*i.qty);
   if(variant==='page'){
     return `<div class="cartp-item" data-id="${p.id}">
-      <a class="cartp-img" href="produkt-${p.id}.html">${visual}</a>
+      <a class="cartp-img" href="produkt.html?id=${encodeURIComponent(p.id)}">${visual}</a>
       <div class="cartp-main">
-        <a href="produkt-${p.id}.html" class="cartp-name">${pName(p)}</a>
+        <a href="produkt.html?id=${encodeURIComponent(p.id)}" class="cartp-name">${pName(p)}</a>
         <span class="cartp-tag">${pTag(p)}</span>
         <button type="button" class="ci-remove" data-id="${p.id}">${tr('cart.remove')}</button>
       </div>

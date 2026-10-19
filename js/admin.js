@@ -37,7 +37,7 @@ const el = {
   addProductBtn: $('addProductBtn'),
   reloadBtn: $('reloadBtn'),
   seedBox: $('seedBox'),
-  seedBtn: $('seedBtn'),
+  deleteAllBtn: $('deleteAllBtn'),
   // modal
   productModal: $('productModal'),
   modalClose: $('modalClose'),
@@ -341,6 +341,7 @@ async function loadProducts() {
 function renderList() {
   if (el.navProducts) el.navProducts.textContent = String(PRODUCTS.length);
   el.seedBox.classList.toggle('hidden', PRODUCTS.length > 0);
+  if (el.deleteAllBtn) el.deleteAllBtn.disabled = PRODUCTS.length === 0;
 
   const q = (el.prodSearch.value || '').trim().toLowerCase();
   const list = q
@@ -538,17 +539,29 @@ async function remove(id) {
   }
 }
 
-/* ---------- import startowych ---------- */
-el.seedBtn.addEventListener('click', async () => {
-  el.seedBtn.disabled = true;
+/* ---------- usuwanie wszystkich produktów ---------- */
+el.deleteAllBtn.addEventListener('click', async () => {
+  if (!PRODUCTS.length) { toast('Brak produktów do usunięcia.', 'ok'); return; }
+  if (!confirm(`Usunąć WSZYSTKIE produkty (${PRODUCTS.length})? Tej operacji nie można cofnąć.`)) return;
+  el.deleteAllBtn.disabled = true;
+  const total = PRODUCTS.length;
+  let done = 0;
   try {
-    await api('/api/seed', { method: 'POST', body: JSON.stringify({}) });
-    toast('Zaimportowano produkty startowe.', 'ok');
+    // kopia listy, bo loadProducts ją podmienia
+    for (const p of [...PRODUCTS]) {
+      el.deleteAllBtn.textContent = `Usuwam… ${done + 1}/${total}`;
+      await api('/api/products/' + encodeURIComponent(p.id), { method: 'DELETE' });
+      done += 1;
+    }
+    toast(`Usunięto ${done} produkt(ów).`, 'ok');
     await loadProducts();
+    await loadOrders();
   } catch (err) {
     toast(err.message, 'err');
+    await loadProducts();
   } finally {
-    el.seedBtn.disabled = false;
+    el.deleteAllBtn.disabled = false;
+    el.deleteAllBtn.textContent = 'Usuń wszystkie';
   }
 });
 
