@@ -161,7 +161,28 @@ async function ensureSchema() {
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_ref TEXT NOT NULL DEFAULT '';`;
 
   await migratePhotos();
+  await removeDemoProducts();
   tableReady = true;
+}
+
+// Jednorazowe usunięcie 9 starych produktów demonstracyjnych (dawny seed),
+// które zostały w bazie. Wykonuje się tylko raz (flaga w aw_meta), więc produkt
+// dodany później w panelu o takim samym id nie zostanie już skasowany.
+const DEMO_PRODUCT_IDS = [
+  'polka-dab', 'stol-plaster', 'wieszak-deska', 'komoda', 'stojak-noze',
+  'organizer', 'wieszak-galaz', 'ekspozytor-miecze', 'stolek-poroze',
+];
+async function removeDemoProducts() {
+  const done = await sql`SELECT val FROM aw_meta WHERE key = 'demo_products_removed';`;
+  if (done.rows.length && done.rows[0].val === '1') return;
+  for (const id of DEMO_PRODUCT_IDS) {
+    // product_photos / product_images kasują się kaskadowo (ON DELETE CASCADE).
+    await sql`DELETE FROM products WHERE id = ${id};`;
+  }
+  await sql`
+    INSERT INTO aw_meta (key, val) VALUES ('demo_products_removed', '1')
+    ON CONFLICT (key) DO UPDATE SET val = '1';
+  `;
 }
 
 // Jednorazowa migracja: dla każdego produktu bez żadnego zdjęcia w galerii tworzymy
